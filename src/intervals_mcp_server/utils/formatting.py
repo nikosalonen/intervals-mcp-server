@@ -4,6 +4,7 @@ Formatting utilities for Intervals.icu MCP Server
 This module contains formatting functions for handling data from the Intervals.icu API.
 """
 
+import json
 from datetime import datetime
 from typing import Any
 
