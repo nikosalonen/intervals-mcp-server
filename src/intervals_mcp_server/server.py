@@ -71,9 +71,11 @@ mcp_instance.mcp = mcp
 # Import tool modules to register them (tools register themselves via @mcp.tool() decorators)
 # Import tool functions for re-export (imported after mcp instance creation)
 from intervals_mcp_server.tools.activities import (  # pylint: disable=wrong-import-position  # noqa: E402
+    add_activity_message,
     get_activities,
     get_activity_details,
     get_activity_intervals,
+    get_activity_messages,
     get_activity_streams,
 )
 from intervals_mcp_server.tools.events import (  # pylint: disable=wrong-import-position  # noqa: E402
@@ -90,9 +92,11 @@ from intervals_mcp_server.tools.wellness import get_wellness_data  # pylint: dis
 __all__ = [
     "make_intervals_request",
     "httpx_client",  # Re-exported for test compatibility
+    "add_activity_message",
     "get_activities",
     "get_activity_details",
     "get_activity_intervals",
+    "get_activity_messages",
     "get_activity_streams",
     "get_events",
     "get_event_by_id",
