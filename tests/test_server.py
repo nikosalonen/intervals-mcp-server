@@ -340,6 +340,21 @@ def test_add_activity_message(monkeypatch):
     assert "42" in result
 
 
+def test_add_activity_message_missing_id(monkeypatch):
+    """Test add_activity_message warns when response has no ID."""
+
+    async def fake_request(*_args, **_kwargs):
+        return {"new_chat": None}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.activities.make_intervals_request", fake_request
+    )
+    result = asyncio.run(add_activity_message(activity_id="i123", content="Hello"))
+    assert "appears to have been added" in result
+    assert "verify manually" in result
+
+
 def test_add_activity_message_unexpected_response(monkeypatch):
     """Test add_activity_message handles unexpected non-dict response."""
 

@@ -376,5 +376,7 @@ async def add_activity_message(
     if not result or not isinstance(result, dict):
         return "Error: Unexpected response when adding message."
 
-    msg_id = result.get("id", "unknown")
-    return f"Successfully added message (ID: {msg_id}) to activity {activity_id}."
+    msg_id = result.get("id")
+    if msg_id is not None:
+        return f"Successfully added message (ID: {msg_id}) to activity {activity_id}."
+    return f"Message appears to have been added to activity {activity_id}, but no ID was returned. Please verify manually."
