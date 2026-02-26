@@ -128,7 +128,7 @@ Description: {_fmt(workout.description, "No description")}
 Sport: {_fmt(workout.type, "Unknown")}
 Type: {_fmt(workout.type)}
 Folder ID: {_fmt(workout.folder_id)}
-Tags: {_fmt(", ".join(workout.tags) if workout.tags else None)}
+Tags: {_fmt(", ".join(str(t) for t in workout.tags if t is not None) if workout.tags else None)}
 Indoor: {_fmt(workout.indoor)}
 Distance: {_fmt(workout.distance)}
 Color: {_fmt(workout.color)}
@@ -440,7 +440,7 @@ def format_sport_settings(setting: AthleteSportSettings) -> str:
 def format_search_result(result: Activity) -> str:
     """Format a lightweight activity search result."""
     start = _fmt_datetime(result.start_date) if result.start_date else "N/A"
-    tags_str = ", ".join(result.tags) if result.tags else "none"
+    tags_str = ", ".join(str(t) for t in result.tags if t is not None) if result.tags else "none"
     return (
         f"ID: {_fmt(result.id)} | {_fmt(result.name, 'Unnamed')} | "
         f"{start} | {_fmt(result.type)} | {result.distance or 0} m | Tags: {tags_str}"
@@ -469,78 +469,70 @@ def format_intervals(intervals_data: IntervalsData) -> str:
     Returns:
         A formatted string representation of the intervals data.
     """
-    result = f"""Intervals Analysis:
-
-ID: {_fmt(intervals_data.id)}
-Analyzed: {_fmt(intervals_data.analyzed)}
-
-"""
+    parts = [
+        f"Intervals Analysis:\n\nID: {_fmt(intervals_data.id)}\nAnalyzed: {_fmt(intervals_data.analyzed)}\n\n"
+    ]
 
     if intervals_data.icu_intervals:
-        result += "Individual Intervals:\n\n"
+        parts.append("Individual Intervals:\n\n")
 
         for i, interval in enumerate(intervals_data.icu_intervals, 1):
             label = interval.label or f"Interval {i}"
             itype = interval.type or "Unknown"
-            result += f"""[{i}] {label} ({itype})
-Duration: {interval.elapsed_time or 0} seconds (moving: {interval.moving_time or 0} seconds)
-Distance: {interval.distance or 0} meters
-Start-End Indices: {interval.start_index or 0}-{interval.end_index or 0}
-
-Power Metrics:
-  Average Power: {interval.average_watts or 0} watts ({interval.average_watts_kg or 0} W/kg)
-  Max Power: {interval.max_watts or 0} watts ({interval.max_watts_kg or 0} W/kg)
-  Weighted Avg Power: {interval.weighted_average_watts or 0} watts
-  Intensity: {interval.intensity or 0}
-  Training Load: {interval.training_load or 0}
-  Joules: {interval.joules or 0}
-  Joules > FTP: {interval.joules_above_ftp or 0}
-  Power Zone: {_fmt(interval.zone)} ({interval.zone_min_watts or 0}-{interval.zone_max_watts or 0} watts)
-  W' Balance: Start {interval.wbal_start or 0}, End {interval.wbal_end or 0}
-  L/R Balance: {interval.avg_lr_balance or 0}
-  Variability: {interval.w5s_variability or 0}
-  Torque: Avg {interval.average_torque or 0}, Min {interval.min_torque or 0}, Max {interval.max_torque or 0}
-
-Heart Rate & Metabolic:
-  Heart Rate: Avg {interval.average_heartrate or 0}, Min {interval.min_heartrate or 0}, Max {interval.max_heartrate or 0} bpm
-  Decoupling: {interval.decoupling or 0}
-  DFA α1: {interval.average_dfa_a1 or 0}
-  Respiration: {interval.average_respiration or 0} breaths/min
-  EPOC: {interval.average_epoc or 0}
-  SmO2: {interval.average_smo2 or 0}% / {interval.average_smo2_2 or 0}%
-  THb: {interval.average_thb or 0} / {interval.average_thb_2 or 0}
-
-Speed & Cadence:
-  Speed: Avg {interval.average_speed or 0}, Min {interval.min_speed or 0}, Max {interval.max_speed or 0} m/s
-  GAP: {interval.gap or 0} m/s
-  Cadence: Avg {interval.average_cadence or 0}, Min {interval.min_cadence or 0}, Max {interval.max_cadence or 0} rpm
-  Stride: {interval.average_stride or 0}
-
-Elevation & Environment:
-  Elevation Gain: {interval.total_elevation_gain or 0} meters
-  Altitude: Min {interval.min_altitude or 0}, Max {interval.max_altitude or 0} meters
-  Gradient: {interval.average_gradient or 0}%
-  Temperature: {interval.average_temp or 0}°C (Weather: {interval.average_weather_temp or 0}°C, Feels like: {interval.average_feels_like or 0}°C)
-  Wind: Speed {interval.average_wind_speed or 0} km/h, Gust {interval.average_wind_gust or 0} km/h, Direction {interval.prevailing_wind_deg or 0}°
-  Headwind: {interval.headwind_percent or 0}%, Tailwind: {interval.tailwind_percent or 0}%
-
-"""
+            parts.append(
+                f"[{i}] {label} ({itype})\n"
+                f"Duration: {interval.elapsed_time or 0} seconds (moving: {interval.moving_time or 0} seconds)\n"
+                f"Distance: {interval.distance or 0} meters\n"
+                f"Start-End Indices: {interval.start_index or 0}-{interval.end_index or 0}\n"
+                f"\nPower Metrics:\n"
+                f"  Average Power: {interval.average_watts or 0} watts ({interval.average_watts_kg or 0} W/kg)\n"
+                f"  Max Power: {interval.max_watts or 0} watts ({interval.max_watts_kg or 0} W/kg)\n"
+                f"  Weighted Avg Power: {interval.weighted_average_watts or 0} watts\n"
+                f"  Intensity: {interval.intensity or 0}\n"
+                f"  Training Load: {interval.training_load or 0}\n"
+                f"  Joules: {interval.joules or 0}\n"
+                f"  Joules > FTP: {interval.joules_above_ftp or 0}\n"
+                f"  Power Zone: {_fmt(interval.zone)} ({interval.zone_min_watts or 0}-{interval.zone_max_watts or 0} watts)\n"
+                f"  W' Balance: Start {interval.wbal_start or 0}, End {interval.wbal_end or 0}\n"
+                f"  L/R Balance: {interval.avg_lr_balance or 0}\n"
+                f"  Variability: {interval.w5s_variability or 0}\n"
+                f"  Torque: Avg {interval.average_torque or 0}, Min {interval.min_torque or 0}, Max {interval.max_torque or 0}\n"
+                f"\nHeart Rate & Metabolic:\n"
+                f"  Heart Rate: Avg {interval.average_heartrate or 0}, Min {interval.min_heartrate or 0}, Max {interval.max_heartrate or 0} bpm\n"
+                f"  Decoupling: {interval.decoupling or 0}\n"
+                f"  DFA α1: {interval.average_dfa_a1 or 0}\n"
+                f"  Respiration: {interval.average_respiration or 0} breaths/min\n"
+                f"  EPOC: {interval.average_epoc or 0}\n"
+                f"  SmO2: {interval.average_smo2 or 0}% / {interval.average_smo2_2 or 0}%\n"
+                f"  THb: {interval.average_thb or 0} / {interval.average_thb_2 or 0}\n"
+                f"\nSpeed & Cadence:\n"
+                f"  Speed: Avg {interval.average_speed or 0}, Min {interval.min_speed or 0}, Max {interval.max_speed or 0} m/s\n"
+                f"  GAP: {interval.gap or 0} m/s\n"
+                f"  Cadence: Avg {interval.average_cadence or 0}, Min {interval.min_cadence or 0}, Max {interval.max_cadence or 0} rpm\n"
+                f"  Stride: {interval.average_stride or 0}\n"
+                f"\nElevation & Environment:\n"
+                f"  Elevation Gain: {interval.total_elevation_gain or 0} meters\n"
+                f"  Altitude: Min {interval.min_altitude or 0}, Max {interval.max_altitude or 0} meters\n"
+                f"  Gradient: {interval.average_gradient or 0}%\n"
+                f"  Temperature: {interval.average_temp or 0}°C (Weather: {interval.average_weather_temp or 0}°C, Feels like: {interval.average_feels_like or 0}°C)\n"
+                f"  Wind: Speed {interval.average_wind_speed or 0} km/h, Gust {interval.average_wind_gust or 0} km/h, Direction {interval.prevailing_wind_deg or 0}°\n"
+                f"  Headwind: {interval.headwind_percent or 0}%, Tailwind: {interval.tailwind_percent or 0}%\n\n"
+            )
 
     if intervals_data.icu_groups:
-        result += "Interval Groups:\n\n"
+        parts.append("Interval Groups:\n\n")
 
         for i, group in enumerate(intervals_data.icu_groups, 1):
-            result += f"""Group: {_fmt(group.id, f"Group {i}")} (Contains {group.count or 0} intervals)
-Duration: {group.elapsed_time or 0} seconds (moving: {group.moving_time or 0} seconds)
-Distance: {group.distance or 0} meters
-Start-End Indices: {group.start_index or 0}-N/A
+            parts.append(
+                f"Group: {_fmt(group.id, f'Group {i}')} (Contains {group.count or 0} intervals)\n"
+                f"Duration: {group.elapsed_time or 0} seconds (moving: {group.moving_time or 0} seconds)\n"
+                f"Distance: {group.distance or 0} meters\n"
+                f"Start-End Indices: {group.start_index or 0}-N/A\n\n"
+                f"Power: Avg {group.average_watts or 0} watts ({group.average_watts_kg or 0} W/kg), Max {group.max_watts or 0} watts\n"
+                f"W. Avg Power: {group.weighted_average_watts or 0} watts, Intensity: {group.intensity or 0}\n"
+                f"Heart Rate: Avg {group.average_heartrate or 0}, Max {group.max_heartrate or 0} bpm\n"
+                f"Speed: Avg {group.average_speed or 0}, Max {group.max_speed or 0} m/s\n"
+                f"Cadence: Avg {group.average_cadence or 0}, Max {group.max_cadence or 0} rpm\n\n"
+            )
 
-Power: Avg {group.average_watts or 0} watts ({group.average_watts_kg or 0} W/kg), Max {group.max_watts or 0} watts
-W. Avg Power: {group.weighted_average_watts or 0} watts, Intensity: {group.intensity or 0}
-Heart Rate: Avg {group.average_heartrate or 0}, Max {group.max_heartrate or 0} bpm
-Speed: Avg {group.average_speed or 0}, Max {group.max_speed or 0} m/s
-Cadence: Avg {group.average_cadence or 0}, Max {group.max_cadence or 0} rpm
-
-"""
-
-    return result
+    return "".join(parts)
