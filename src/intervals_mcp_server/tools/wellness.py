@@ -65,10 +65,20 @@ async def get_wellness_data(
             if isinstance(data, dict):
                 # Ensure the date key is set so WellnessEntry.id is populated
                 entry_data = data if "id" in data else {**data, "id": date_str}
-                wellness_summary += format_wellness_entry(WellnessEntry.from_dict(entry_data)) + "\n\n"
+                try:
+                    wellness_summary += (
+                        format_wellness_entry(WellnessEntry.from_dict(entry_data)) + "\n\n"
+                    )
+                except (TypeError, KeyError, ValueError) as e:
+                    logger.warning("Failed to format wellness entry for %s: %s", date_str, e)
     elif isinstance(result, list):
         for entry in result:
             if isinstance(entry, dict):
-                wellness_summary += format_wellness_entry(WellnessEntry.from_dict(entry)) + "\n\n"
+                try:
+                    wellness_summary += (
+                        format_wellness_entry(WellnessEntry.from_dict(entry)) + "\n\n"
+                    )
+                except (TypeError, KeyError, ValueError) as e:
+                    logger.warning("Failed to format wellness entry: %s", e)
 
     return wellness_summary
