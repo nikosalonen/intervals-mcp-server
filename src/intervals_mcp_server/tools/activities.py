@@ -10,6 +10,7 @@ from typing import Any
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.formatting import format_activity_message, format_activity_summary, format_intervals
+from intervals_mcp_server.utils.schemas import Activity, ActivityMessage, IntervalsData
 from intervals_mcp_server.utils.validation import resolve_athlete_id, resolve_date_params
 
 # Import mcp instance from shared module for tool registration
@@ -93,7 +94,7 @@ def _format_activities_response(
     activities_summary = "Activities:\n\n"
     for activity in activities:
         if isinstance(activity, dict):
-            activities_summary += format_activity_summary(activity) + "\n"
+            activities_summary += format_activity_summary(Activity.from_dict(activity)) + "\n"
         else:
             activities_summary += f"Invalid activity format: {activity}\n\n"
 
@@ -191,7 +192,7 @@ async def get_activity_details(activity_id: str, api_key: str | None = None) -> 
         return f"Invalid activity format for activity {activity_id}."
 
     # Return a more detailed view of the activity
-    detailed_view = format_activity_summary(activity_data)
+    detailed_view = format_activity_summary(Activity.from_dict(activity_data))
 
     # Add additional details if available
     if "zones" in activity_data:
@@ -236,7 +237,7 @@ async def get_activity_intervals(activity_id: str, api_key: str | None = None) -
         return f"No interval data or unrecognized format for activity {activity_id}."
 
     # Format the intervals data
-    return format_intervals(result)
+    return format_intervals(IntervalsData.from_dict(result))
 
 
 @mcp.tool()
@@ -344,7 +345,7 @@ async def get_activity_messages(activity_id: str, api_key: str | None = None) ->
     output = f"Messages for activity {activity_id}:\n\n"
     for msg in messages:
         if isinstance(msg, dict):
-            output += format_activity_message(msg) + "\n\n"
+            output += format_activity_message(ActivityMessage.from_dict(msg)) + "\n\n"
 
     return output
 

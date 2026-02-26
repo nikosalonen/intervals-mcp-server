@@ -74,6 +74,9 @@ class PaceUnits(Enum):
     MINS_KM = "MINS_KM"
     MINS_MILE = "MINS_MILE"
     SECS_500M = "SECS_500M"
+    SECS_400M = "SECS_400M"
+    SECS_250M = "SECS_250M"
+    NONE = "NONE"
 
 
 class ValueUnits(Enum):

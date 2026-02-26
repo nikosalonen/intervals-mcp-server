@@ -12,6 +12,7 @@ from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.dates import get_default_end_date, get_default_future_end_date
 from intervals_mcp_server.utils.formatting import format_event_details, format_event_summary
+from intervals_mcp_server.utils.schemas import EventRequest, EventResponse
 from intervals_mcp_server.utils.types import WorkoutDoc
 from intervals_mcp_server.utils.validation import resolve_athlete_id, validate_date
 
@@ -52,15 +53,15 @@ def _prepare_event_data(  # pylint: disable=too-many-arguments,too-many-position
     Many arguments are required to match the Intervals.icu API event structure.
     """
     resolved_workout_type = _resolve_workout_type(name, workout_type)
-    return {
-        "start_date_local": start_date + "T00:00:00",
-        "category": "WORKOUT",
-        "name": name,
-        "description": str(workout_doc) if workout_doc else None,
-        "type": resolved_workout_type,
-        "moving_time": moving_time,
-        "distance": distance,
-    }
+    return EventRequest(
+        start_date_local=start_date + "T00:00:00",
+        category="WORKOUT",
+        name=name,
+        type=resolved_workout_type,
+        description=str(workout_doc) if workout_doc else None,
+        moving_time=moving_time,
+        distance=distance,
+    ).to_dict()
 
 
 def _handle_event_response(
@@ -158,7 +159,7 @@ async def get_events(
         if not isinstance(event, dict):
             continue
 
-        events_summary += format_event_summary(event) + "\n\n"
+        events_summary += format_event_summary(EventResponse.from_dict(event)) + "\n\n"
 
     return events_summary
 
@@ -197,7 +198,7 @@ async def get_event_by_id(
     if not isinstance(result, dict):
         return f"Invalid event format for event {event_id}."
 
-    return format_event_details(result)
+    return format_event_details(EventResponse.from_dict(result))
 
 
 @mcp.tool()

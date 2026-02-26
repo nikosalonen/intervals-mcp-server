@@ -7,6 +7,7 @@ This module contains tools for retrieving athlete profile and sport settings (FT
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.formatting import format_athlete_summary, format_sport_settings
+from intervals_mcp_server.utils.schemas import Athlete, AthleteSportSettings
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
 # Import mcp instance from shared module for tool registration
@@ -41,7 +42,7 @@ async def get_athlete(
     if not isinstance(result, dict):
         return "Unexpected response from API."
 
-    return format_athlete_summary(result)
+    return format_athlete_summary(Athlete.from_dict(result))
 
 
 @mcp.tool()
@@ -75,15 +76,19 @@ async def get_sport_settings(
     if sport_type:
         if not isinstance(result, dict):
             return "Unexpected response from API."
-        return format_sport_settings(result)
+        return format_sport_settings(AthleteSportSettings.from_dict(result))
 
     # All sports: result is a list or dict of sport settings
     if isinstance(result, list):
         return "\n\n---\n\n".join(
-            format_sport_settings(s) for s in result if isinstance(s, dict)
+            format_sport_settings(AthleteSportSettings.from_dict(s))
+            for s in result
+            if isinstance(s, dict)
         )
     if isinstance(result, dict):
         return "\n\n---\n\n".join(
-            format_sport_settings(s) for s in result.values() if isinstance(s, dict)
+            format_sport_settings(AthleteSportSettings.from_dict(s))
+            for s in result.values()
+            if isinstance(s, dict)
         )
     return "No sport settings found."

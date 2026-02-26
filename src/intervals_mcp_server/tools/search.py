@@ -7,6 +7,7 @@ This module contains tools for searching activities by name/tag and by interval 
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.formatting import format_search_result
+from intervals_mcp_server.utils.schemas import Activity
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
 # Import mcp instance from shared module for tool registration
@@ -54,7 +55,7 @@ async def search_activities(
         return "No activities found."
 
     return "Search results:\n\n" + "\n".join(
-        format_search_result(a) for a in activities if isinstance(a, dict)
+        format_search_result(Activity.from_dict(a)) for a in activities if isinstance(a, dict)
     )
 
 
@@ -113,5 +114,5 @@ async def search_intervals(
         return "No activities found with matching intervals."
 
     return "Interval search results:\n\n" + "\n".join(
-        format_search_result(a) for a in activities if isinstance(a, dict)
+        format_search_result(Activity.from_dict(a)) for a in activities if isinstance(a, dict)
     )

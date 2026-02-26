@@ -7,6 +7,7 @@ This module contains tools for listing workouts, folders, and creating workouts 
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.formatting import format_folder_summary, format_workout
+from intervals_mcp_server.utils.schemas import Folder, Workout
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
 # Import mcp instance from shared module for tool registration
@@ -43,7 +44,7 @@ async def list_workouts(
         return "No workouts in library."
 
     return "Workout library:\n\n" + "\n".join(
-        format_workout(w).strip() for w in workouts if isinstance(w, dict)
+        format_workout(Workout.from_dict(w)).strip() for w in workouts if isinstance(w, dict)
     )
 
 
@@ -75,7 +76,7 @@ async def list_folders(
         return "No folders found."
 
     return "Folders:\n\n" + "\n\n".join(
-        format_folder_summary(f) for f in folders if isinstance(f, dict)
+        format_folder_summary(Folder.from_dict(f)) for f in folders if isinstance(f, dict)
     )
 
 

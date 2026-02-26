@@ -13,6 +13,13 @@ from intervals_mcp_server.utils.formatting import (
     format_event_details,
     format_intervals,
 )
+from intervals_mcp_server.utils.schemas import (
+    Activity,
+    EventResponse,
+    IntervalsData,
+    WellnessEntry,
+    Workout,
+)
 from tests.sample_data import INTERVALS_DATA
 
 
@@ -28,26 +35,24 @@ def test_format_activity_summary():
         "distance": 1000,
         "duration": 3600,
     }
-    result = format_activity_summary(data)
+    result = format_activity_summary(Activity.from_dict(data))
     assert "Activity: Morning Ride" in result
     assert "ID: 1" in result
 
 
 def test_format_workout():
     """
-    Test that format_workout returns a string containing the workout name and interval count.
+    Test that format_workout returns a string containing the workout name.
     """
     workout = {
         "name": "Workout1",
         "description": "desc",
-        "sport": "Ride",
-        "duration": 3600,
-        "tss": 50,
-        "intervals": [1, 2, 3],
+        "type": "Ride",
+        "moving_time": 3600,
+        "icu_training_load": 50,
     }
-    result = format_workout(workout)
+    result = format_workout(Workout.from_dict(workout))
     assert "Workout: Workout1" in result
-    assert "Intervals: 3" in result
 
 
 def test_format_wellness_entry():
@@ -56,7 +61,7 @@ def test_format_wellness_entry():
     """
     with open("tests/ressources/wellness_entry.json", "r", encoding="utf-8") as f:
         entry = json.load(f)
-    result = format_wellness_entry(entry)
+    result = format_wellness_entry(WellnessEntry.from_dict(entry))
 
     with open("tests/ressources/wellness_entry_formatted.txt", "r", encoding="utf-8") as f:
         expected_result = f.read()
@@ -74,7 +79,7 @@ def test_format_event_summary():
         "description": "desc",
         "race": True,
     }
-    summary = format_event_summary(event)
+    summary = format_event_summary(EventResponse.from_dict(event))
     assert "Date: 2024-01-01" in summary
     assert "Type: Race" in summary
 
@@ -90,9 +95,9 @@ def test_format_event_details():
         "description": "desc",
         "workout": {
             "id": "w1",
-            "sport": "Ride",
-            "duration": 3600,
-            "tss": 50,
+            "type": "Ride",
+            "moving_time": 3600,
+            "icu_training_load": 50,
             "intervals": [1, 2],
         },
         "race": True,
@@ -100,7 +105,7 @@ def test_format_event_details():
         "result": "1st",
         "calendar": {"name": "Main"},
     }
-    details = format_event_details(event)
+    details = format_event_details(EventResponse.from_dict(event))
     assert "Event Details:" in details
     assert "Workout Information:" in details
 
@@ -109,6 +114,6 @@ def test_format_intervals():
     """
     Test that format_intervals returns a string containing interval analysis and the interval label.
     """
-    result = format_intervals(INTERVALS_DATA)
+    result = format_intervals(IntervalsData.from_dict(INTERVALS_DATA))
     assert "Intervals Analysis:" in result
     assert "Rep 1" in result
