@@ -33,6 +33,11 @@ Usage:
         - delete_events_by_date_range
         - add_or_update_event
         - get_wellness_data
+        - get_custom_items
+        - get_custom_item_by_id
+        - create_custom_item
+        - update_custom_item
+        - delete_custom_item
 
     See the README for more details on configuration and usage.
 """
