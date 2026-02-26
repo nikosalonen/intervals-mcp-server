@@ -481,9 +481,7 @@ class WorkoutDoc:  # pylint: disable=too-many-instance-attributes
     category: str | None = None
     target: WorkoutTarget | None = None
     steps: list[Step] | None = None
-    zone_times: list[int | Any] | None = (
-        None  # sometimes array of ints otherwise array of objects
-    )
+    zone_times: list[Any] | None = None  # sometimes array of ints, otherwise array of objects
     options: dict[str, str] | None = None
     locales: list[str] | None = None
 
