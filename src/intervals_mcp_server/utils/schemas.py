@@ -879,7 +879,7 @@ class EventWorkout:
             icu_training_load=_first(
                 data.get("icu_training_load"), data.get("tss")
             ),
-            intervals=data.get("intervals") or [],
+            intervals=_dict_items(data.get("intervals") or [], "intervals"),
         )
 
 

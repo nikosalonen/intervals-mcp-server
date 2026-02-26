@@ -241,7 +241,7 @@ def test_event_response_from_dict_with_workout():
             "type": "Ride",
             "moving_time": 3600,
             "icu_training_load": 80,
-            "intervals": [1, 2, 3],
+            "intervals": [{"type": "warmup"}, {"type": "work"}, {"type": "cooldown"}],
         },
     }
     e = EventResponse.from_dict(data)
