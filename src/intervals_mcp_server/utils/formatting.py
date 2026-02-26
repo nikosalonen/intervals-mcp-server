@@ -98,12 +98,82 @@ File Type: {activity.get("file_type", "N/A")}
 """
 
 
+def format_athlete_summary(athlete: dict[str, Any]) -> str:
+    """Format athlete profile into a readable string (name, ID, weight, resting HR, location, timezone, status)."""
+    return f"""Athlete: {athlete.get("name", "N/A")}
+ID: {athlete.get("id", "N/A")}
+Weight: {athlete.get("weight", "N/A")} kg
+Resting HR: {athlete.get("restingHr", athlete.get("resting_hr", "N/A"))} bpm
+Location: {athlete.get("location", "N/A")}
+Timezone: {athlete.get("timezone", "N/A")}
+Status: {athlete.get("status", "N/A")}"""
+
+
+def format_sport_settings(setting: dict[str, Any]) -> str:
+    """Format sport settings into a readable string (FTP, zones, LTHR, max HR, pace thresholds, warmup/cooldown)."""
+    lines = [
+        f"Sport: {setting.get('type', 'N/A')}",
+        f"FTP: {setting.get('ftp', 'N/A')}",
+        f"LTHR: {setting.get('lthr', 'N/A')}",
+        f"Max HR: {setting.get('maxHr', setting.get('max_hr', 'N/A'))}",
+        f"Pace thresholds: {setting.get('paceZones', setting.get('pace_zones', 'N/A'))}",
+        f"Warmup: {setting.get('warmup', 'N/A')} s",
+        f"Cooldown: {setting.get('cooldown', 'N/A')} s",
+    ]
+    zones = setting.get("zones", setting.get("powerZones", []))
+    if zones:
+        lines.append(f"Zones: {zones}")
+    return "\n".join(lines)
+
+
+def format_search_result(result: dict[str, Any]) -> str:
+    """Format a lightweight activity search result (ID, name, date, type, distance, tags)."""
+    start = result.get("startTime", result.get("start_date", "N/A"))
+    if isinstance(start, str) and len(start) > 10:
+        try:
+            dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            start = dt.strftime("%Y-%m-%d %H:%M")
+        except ValueError:
+            pass
+    tags = result.get("tags", [])
+    tags_str = ", ".join(tags) if isinstance(tags, list) else str(tags)
+    return f"ID: {result.get('id', 'N/A')} | {result.get('name', 'Unnamed')} | {start} | {result.get('type', 'N/A')} | {result.get('distance', 0)} m | Tags: {tags_str or 'none'}"
+
+
+def format_folder_summary(folder: dict[str, Any]) -> str:
+    """Format workout folder summary (name, ID, child workout count and names)."""
+    workouts = folder.get("workouts", folder.get("children", []))
+    count = len(workouts) if isinstance(workouts, list) else 0
+    names = []
+    if isinstance(workouts, list):
+        for w in workouts:
+            if isinstance(w, dict) and w.get("name"):
+                names.append(w["name"])
+            elif isinstance(w, str):
+                names.append(w)
+    lines = [
+        f"Folder: {folder.get('name', 'N/A')}",
+        f"ID: {folder.get('id', 'N/A')}",
+        f"Workouts: {count}",
+    ]
+    if names:
+        lines.extend(f"- {n}" for n in names)
+    return "\n".join(lines)
+
+
 def format_workout(workout: dict[str, Any]) -> str:
     """Format a workout into a readable string."""
     return f"""
 Workout: {workout.get("name", "Unnamed")}
+ID: {workout.get("id", "N/A")}
 Description: {workout.get("description", "No description")}
-Sport: {workout.get("sport", "Unknown")}
+Sport: {workout.get("sport", workout.get("type", "Unknown"))}
+Type: {workout.get("type", "N/A")}
+Folder ID: {workout.get("folderId", workout.get("folder_id", "N/A"))}
+Tags: {workout.get("tags", "N/A")}
+Indoor: {workout.get("indoor", "N/A")}
+Distance: {workout.get("distance", "N/A")}
+Color: {workout.get("color", "N/A")}
 Duration: {workout.get("duration", 0)} seconds
 TSS: {workout.get("tss", "N/A")}
 Intervals: {len(workout.get("intervals", []))}
