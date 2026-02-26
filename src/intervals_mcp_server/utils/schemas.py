@@ -30,6 +30,15 @@ def _get_list(data: dict[str, Any], *keys: str) -> list[Any]:
     return []
 
 
+def _normalize_tags(raw: Any) -> list[str]:
+    """Normalize a raw tags value into a list of strings."""
+    if isinstance(raw, list):
+        return [str(t) for t in raw if t is not None]
+    if raw is None:
+        return []
+    return [str(raw)]
+
+
 def _dict_items(items: list[Any], context: str = "") -> list[dict[str, Any]]:
     """Filter a list to only dict items, logging any skipped non-dict entries."""
     result: list[dict[str, Any]] = []
@@ -316,7 +325,7 @@ class Activity:
             device_name=data.get("device_name"),
             power_meter=data.get("power_meter"),
             file_type=data.get("file_type"),
-            tags=data.get("tags") or [],
+            tags=_normalize_tags(data.get("tags")),
         )
 
 
@@ -781,7 +790,7 @@ class Workout:
             description=data.get("description"),
             type=data.get("type"),
             folder_id=_first(data.get("folder_id"), data.get("folderId")),
-            tags=data.get("tags") or [],
+            tags=_normalize_tags(data.get("tags")),
             indoor=data.get("indoor"),
             distance=data.get("distance"),
             color=data.get("color"),

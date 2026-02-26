@@ -356,13 +356,19 @@ async def get_activity_messages(activity_id: str, api_key: str | None = None) ->
         return f"No messages found for activity {activity_id}."
 
     output = f"Messages for activity {activity_id}:\n\n"
+    appended_count = 0
     for msg in messages:
         if isinstance(msg, dict):
             try:
                 output += format_activity_message(ActivityMessage.from_dict(msg)) + "\n\n"
+                appended_count += 1
             except (TypeError, KeyError, ValueError) as e:
                 logger.error("Failed to format message: %s", e)
                 output += "[Message could not be displayed]\n\n"
+                appended_count += 1
+
+    if appended_count == 0:
+        output += "[No messages could be displayed]\n\n"
 
     return output
 

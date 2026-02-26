@@ -100,7 +100,7 @@ async def get_sport_settings(
             try:
                 formatted.append(format_sport_settings(AthleteSportSettings.from_dict(s)))
             except (TypeError, KeyError, ValueError) as e:
-                sport_type = s.get("type", "Unknown")
-                logger.error("Failed to format sport setting for %s: %s", sport_type, e)
-                formatted.append(f"[Sport setting '{sport_type}': failed to format]")
+                sport_name = s.get("type", "Unknown")
+                logger.error("Failed to format sport setting for %s: %s", sport_name, e)
+                formatted.append(f"[Sport setting '{sport_name}': failed to format]")
     return "\n\n---\n\n".join(formatted) if formatted else "No sport settings found."

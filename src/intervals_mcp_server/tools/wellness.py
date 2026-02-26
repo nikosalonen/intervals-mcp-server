@@ -57,6 +57,7 @@ async def get_wellness_data(
         )
 
     wellness_summary = "Wellness Data:\n\n"
+    entries_processed = 0
 
     # Handle both list and dictionary responses
     if isinstance(result, dict):
@@ -68,9 +69,11 @@ async def get_wellness_data(
                     wellness_summary += (
                         format_wellness_entry(WellnessEntry.from_dict(entry_data)) + "\n\n"
                     )
+                    entries_processed += 1
                 except (TypeError, KeyError, ValueError) as e:
                     logger.error("Failed to format wellness entry for %s: %s", date_str, e)
                     wellness_summary += f"[Wellness data for {date_str}: failed to format]\n\n"
+                    entries_processed += 1
     elif isinstance(result, list):
         for entry in result:
             if isinstance(entry, dict):
@@ -78,9 +81,14 @@ async def get_wellness_data(
                     wellness_summary += (
                         format_wellness_entry(WellnessEntry.from_dict(entry)) + "\n\n"
                     )
+                    entries_processed += 1
                 except (TypeError, KeyError, ValueError) as e:
                     entry_id = entry.get("id", "unknown")
                     logger.error("Failed to format wellness entry %s: %s", entry_id, e)
                     wellness_summary += f"[Wellness data for {entry_id}: failed to format]\n\n"
+                    entries_processed += 1
+
+    if entries_processed == 0:
+        wellness_summary += "[No wellness data found]\n\n"
 
     return wellness_summary
