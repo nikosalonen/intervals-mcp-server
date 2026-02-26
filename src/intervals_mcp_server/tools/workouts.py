@@ -46,9 +46,14 @@ async def list_workouts(
     if not workouts:
         return "No workouts in library."
 
-    return "Workout library:\n\n" + "\n".join(
-        format_workout(Workout.from_dict(w)).strip() for w in workouts if isinstance(w, dict)
-    )
+    formatted = []
+    for w in workouts:
+        if isinstance(w, dict):
+            try:
+                formatted.append(format_workout(Workout.from_dict(w)).strip())
+            except (TypeError, KeyError, ValueError) as e:
+                logger.warning("Failed to format workout: %s", e)
+    return "Workout library:\n\n" + "\n".join(formatted) if formatted else "No workouts in library."
 
 
 @mcp.tool()
@@ -78,9 +83,14 @@ async def list_folders(
     if not folders:
         return "No folders found."
 
-    return "Folders:\n\n" + "\n\n".join(
-        format_folder_summary(Folder.from_dict(f)) for f in folders if isinstance(f, dict)
-    )
+    formatted = []
+    for f in folders:
+        if isinstance(f, dict):
+            try:
+                formatted.append(format_folder_summary(Folder.from_dict(f)))
+            except (TypeError, KeyError, ValueError) as e:
+                logger.warning("Failed to format folder: %s", e)
+    return "Folders:\n\n" + "\n\n".join(formatted) if formatted else "No folders found."
 
 
 @mcp.tool()
