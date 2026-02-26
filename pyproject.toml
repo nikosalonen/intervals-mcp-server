@@ -7,7 +7,7 @@ name = "intervals-mcp-server"
 version = "0.1.0"
 description = "A Model Context Protocol server for Intervals.icu"
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license = { text = "GPL-3.0-only" }
 authors = [{ name = "Niko Salonen" }]
 dependencies = ["mcp[cli]>=1.4.0", "httpx>=0.25.0", "python-dotenv>=1.0.0"]
