@@ -768,11 +768,12 @@ class Workout:
     moving_time: int | None = None
     icu_training_load: int | None = None
     target: str | None = None
-    workout_doc: dict[str, Any] | None = None
+    workout_doc: WorkoutDoc | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Workout":
         """Create a Workout from a raw API response dict."""
+        raw_doc = _first(data.get("workout_doc"), data.get("workoutDoc"))
         return cls(
             id=data.get("id"),
             athlete_id=data.get("athlete_id"),
@@ -787,7 +788,7 @@ class Workout:
             moving_time=_first(data.get("moving_time"), data.get("duration")),
             icu_training_load=_first(data.get("icu_training_load"), data.get("tss")),
             target=data.get("target"),
-            workout_doc=data.get("workout_doc"),
+            workout_doc=WorkoutDoc.from_dict(raw_doc) if isinstance(raw_doc, dict) else None,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -816,7 +817,7 @@ class Workout:
         if self.target is not None:
             data["target"] = self.target
         if self.workout_doc is not None:
-            data["workout_doc"] = self.workout_doc
+            data["workout_doc"] = self.workout_doc.to_dict()
         return data
 
     def to_json(self) -> str:
@@ -857,7 +858,7 @@ class EventWorkout:
     type: str | None = None
     moving_time: int | None = None
     icu_training_load: int | None = None
-    intervals: list[Any] = field(default_factory=list)
+    intervals: list[dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "EventWorkout":
@@ -924,7 +925,7 @@ class EventRequest:
     type: str = "Ride"
     description: str | None = None
     moving_time: int | None = None
-    distance: int | None = None
+    distance: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict for the API request body, omitting None values."""
