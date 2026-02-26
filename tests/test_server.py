@@ -294,6 +294,21 @@ def test_get_activity_messages(monkeypatch):
     assert "Coach" in result
 
 
+def test_get_activity_messages_error(monkeypatch):
+    """Test get_activity_messages handles API errors gracefully."""
+
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "Activity not found"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.activities.make_intervals_request", fake_request
+    )
+    result = asyncio.run(get_activity_messages(activity_id="i999"))
+    assert "Error fetching activity messages" in result
+    assert "Activity not found" in result
+
+
 def test_get_activity_messages_empty(monkeypatch):
     """Test get_activity_messages returns appropriate message when no messages exist."""
 
