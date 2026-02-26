@@ -128,7 +128,7 @@ Description: {_fmt(workout.description, "No description")}
 Sport: {_fmt(workout.type, "Unknown")}
 Type: {_fmt(workout.type)}
 Folder ID: {_fmt(workout.folder_id)}
-Tags: {workout.tags or "N/A"}
+Tags: {_fmt(", ".join(workout.tags) if workout.tags else None)}
 Indoor: {_fmt(workout.indoor)}
 Distance: {_fmt(workout.distance)}
 Color: {_fmt(workout.color)}
@@ -370,7 +370,10 @@ Priority: {_fmt(event.priority)}
 Result: {_fmt(event.result)}"""
 
     if event.calendar is not None:
-        event_details += f"\n\nCalendar: {_fmt(event.calendar.get('name'))}"
+        if isinstance(event.calendar, dict):
+            event_details += f"\n\nCalendar: {_fmt(event.calendar.get('name'))}"
+        else:
+            event_details += f"\n\nCalendar: {_fmt(event.calendar)}"
 
     return event_details
 
