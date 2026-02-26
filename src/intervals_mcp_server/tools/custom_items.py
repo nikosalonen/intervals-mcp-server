@@ -85,7 +85,11 @@ async def get_custom_item_by_id(
     if not result or not isinstance(result, dict):
         return f"No custom item found with ID {item_id}."
 
-    return format_custom_item_details(CustomItem.from_dict(result))
+    try:
+        return format_custom_item_details(CustomItem.from_dict(result))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.warning("Failed to parse custom item %s: %s", item_id, e)
+        return f"Error: Failed to parse custom item data for {item_id}."
 
 
 @mcp.tool()
@@ -141,7 +145,12 @@ async def create_custom_item(
     if not result or not isinstance(result, dict):
         return "Error: Unexpected response when creating custom item."
 
-    return f"Successfully created custom item:\n\n{format_custom_item_details(CustomItem.from_dict(result))}"
+    try:
+        details = format_custom_item_details(CustomItem.from_dict(result))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.warning("Failed to format created custom item: %s", e)
+        return "Custom item created, but failed to format response."
+    return f"Successfully created custom item:\n\n{details}"
 
 
 @mcp.tool()
@@ -203,7 +212,12 @@ async def update_custom_item(
     if not result or not isinstance(result, dict):
         return "Error: Unexpected response when updating custom item."
 
-    return f"Successfully updated custom item:\n\n{format_custom_item_details(CustomItem.from_dict(result))}"
+    try:
+        details = format_custom_item_details(CustomItem.from_dict(result))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.warning("Failed to format updated custom item: %s", e)
+        return "Custom item updated, but failed to format response."
+    return f"Successfully updated custom item:\n\n{details}"
 
 
 @mcp.tool()
