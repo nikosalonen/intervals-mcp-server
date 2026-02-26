@@ -14,7 +14,6 @@ from intervals_mcp_server.utils.formatting import format_custom_item_details
 from intervals_mcp_server.utils.schemas import CustomItem
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
-# Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -88,7 +87,7 @@ async def get_custom_item_by_id(
     try:
         return format_custom_item_details(CustomItem.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.warning("Failed to parse custom item %s: %s", item_id, e)
+        logger.error("Failed to parse custom item %s: %s", item_id, e)
         return f"Error: Failed to parse custom item data for {item_id}."
 
 
@@ -148,8 +147,8 @@ async def create_custom_item(
     try:
         details = format_custom_item_details(CustomItem.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.warning("Failed to format created custom item: %s", e)
-        return "Custom item created, but failed to format response."
+        logger.error("Failed to format created custom item: %s", e)
+        return f"Custom item created (ID: {result.get('id', 'unknown')}), but failed to format response."
     return f"Successfully created custom item:\n\n{details}"
 
 
@@ -215,8 +214,8 @@ async def update_custom_item(
     try:
         details = format_custom_item_details(CustomItem.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.warning("Failed to format updated custom item: %s", e)
-        return "Custom item updated, but failed to format response."
+        logger.error("Failed to format updated custom item: %s", e)
+        return f"Custom item updated (ID: {result.get('id', 'unknown')}), but failed to format response."
     return f"Successfully updated custom item:\n\n{details}"
 
 

@@ -129,7 +129,6 @@ Workout: {_fmt(workout.name, "Unnamed")}
 ID: {_fmt(workout.id)}
 Description: {_fmt(workout.description, "No description")}
 Sport: {_fmt(workout.type, "Unknown")}
-Type: {_fmt(workout.type)}
 Folder ID: {_fmt(workout.folder_id)}
 Tags: {_fmt(", ".join(str(t) for t in workout.tags if t is not None) if workout.tags else None)}
 Indoor: {_fmt(workout.indoor)}
@@ -266,7 +265,7 @@ def format_wellness_entry(entry: WellnessEntry) -> str:
     """Format wellness entry data into a readable string.
 
     Formats various wellness metrics including training metrics, vital signs,
-    sleep data, menstrual tracking, subjective feelings, nutrition, and activity.
+    sleep data, menstrual tracking, subjective feelings, nutrition, and daily steps.
 
     Args:
         entry: WellnessEntry containing wellness data for a single day.

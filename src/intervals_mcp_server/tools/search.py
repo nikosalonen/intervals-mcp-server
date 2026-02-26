@@ -12,7 +12,6 @@ from intervals_mcp_server.utils.formatting import format_search_result
 from intervals_mcp_server.utils.schemas import Activity
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
-# Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -62,7 +61,9 @@ async def search_activities(
                 if activity.id is not None or activity.name is not None:
                     formatted.append(format_search_result(activity))
             except (TypeError, KeyError, ValueError) as e:
-                logger.warning("Failed to format search result: %s", e)
+                aid = a.get("id", "unknown")
+                logger.error("Failed to format search result %s: %s", aid, e)
+                formatted.append(f"[Search result {aid}: failed to format]")
     if not formatted:
         return "No activities found."
 
@@ -128,7 +129,9 @@ async def search_intervals(
                 if activity.id is not None or activity.name is not None:
                     formatted.append(format_search_result(activity))
             except (TypeError, KeyError, ValueError) as e:
-                logger.warning("Failed to format interval search result: %s", e)
+                aid = a.get("id", "unknown")
+                logger.error("Failed to format interval search result %s: %s", aid, e)
+                formatted.append(f"[Search result {aid}: failed to format]")
     if not formatted:
         return "No activities found with matching intervals."
 

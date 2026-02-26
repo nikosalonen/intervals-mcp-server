@@ -12,7 +12,6 @@ from intervals_mcp_server.utils.formatting import format_folder_summary, format_
 from intervals_mcp_server.utils.schemas import Folder, Workout
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
-# Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -52,7 +51,9 @@ async def list_workouts(
             try:
                 formatted.append(format_workout(Workout.from_dict(w)).strip())
             except (TypeError, KeyError, ValueError) as e:
-                logger.warning("Failed to format workout: %s", e)
+                wid = w.get("id", "unknown")
+                logger.error("Failed to format workout %s: %s", wid, e)
+                formatted.append(f"[Workout {wid}: failed to format]")
     return "Workout library:\n\n" + "\n".join(formatted) if formatted else "No workouts in library."
 
 
@@ -89,7 +90,9 @@ async def list_folders(
             try:
                 formatted.append(format_folder_summary(Folder.from_dict(f)))
             except (TypeError, KeyError, ValueError) as e:
-                logger.warning("Failed to format folder: %s", e)
+                fid = f.get("id", "unknown")
+                logger.error("Failed to format folder %s: %s", fid, e)
+                formatted.append(f"[Folder {fid}: failed to format]")
     return "Folders:\n\n" + "\n\n".join(formatted) if formatted else "No folders found."
 
 

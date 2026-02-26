@@ -12,7 +12,6 @@ from intervals_mcp_server.utils.formatting import format_athlete_summary, format
 from intervals_mcp_server.utils.schemas import Athlete, AthleteSportSettings
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
-# Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -48,7 +47,7 @@ async def get_athlete(
     try:
         return format_athlete_summary(Athlete.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.warning("Failed to parse athlete data: %s", e)
+        logger.error("Failed to parse athlete data: %s", e)
         return "Error: Failed to parse athlete data."
 
 
@@ -86,7 +85,7 @@ async def get_sport_settings(
         try:
             return format_sport_settings(AthleteSportSettings.from_dict(result))
         except (TypeError, KeyError, ValueError) as e:
-            logger.warning("Failed to parse sport settings: %s", e)
+            logger.error("Failed to parse sport settings: %s", e)
             return "Error: Failed to parse sport settings."
 
     # All sports: result is a list or dict of sport settings
@@ -101,5 +100,7 @@ async def get_sport_settings(
             try:
                 formatted.append(format_sport_settings(AthleteSportSettings.from_dict(s)))
             except (TypeError, KeyError, ValueError) as e:
-                logger.warning("Failed to format sport setting: %s", e)
+                sport_type = s.get("type", "Unknown")
+                logger.error("Failed to format sport setting for %s: %s", sport_type, e)
+                formatted.append(f"[Sport setting '{sport_type}': failed to format]")
     return "\n\n---\n\n".join(formatted) if formatted else "No sport settings found."

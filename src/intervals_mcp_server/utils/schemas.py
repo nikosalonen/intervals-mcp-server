@@ -37,7 +37,7 @@ def _dict_items(items: list[Any], context: str = "") -> list[dict[str, Any]]:
         if isinstance(item, dict):
             result.append(item)
         elif item is not None:
-            logger.debug("Skipped non-dict item (type=%s) in %s", type(item).__name__, context)
+            logger.warning("Skipped non-dict item (type=%s) in %s", type(item).__name__, context)
     return result
 
 
@@ -249,7 +249,7 @@ class Activity:
     def from_dict(cls, data: dict[str, Any]) -> "Activity":
         """Create an Activity from a raw API response dict.
 
-        Handles both camelCase and snake_case field variants returned by the API.
+        Maps select camelCase API aliases (e.g., startTime, avgHr, avgPower) to snake_case fields.
         """
         return cls(
             id=data.get("id"),
@@ -736,7 +736,7 @@ class CustomItem:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dict for API requests, omitting None values."""
+        """Convert to dict for API request bodies, including only API-accepted fields and omitting None values."""
         data: dict[str, Any] = {}
         if self.name is not None:
             data["name"] = self.name
@@ -792,7 +792,7 @@ class Workout:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dict for API requests, omitting None values."""
+        """Convert to dict for API request bodies, including only API-accepted fields and omitting None values."""
         data: dict[str, Any] = {}
         if self.name is not None:
             data["name"] = self.name

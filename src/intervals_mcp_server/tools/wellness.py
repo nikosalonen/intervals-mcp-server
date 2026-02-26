@@ -12,7 +12,6 @@ from intervals_mcp_server.utils.formatting import format_wellness_entry
 from intervals_mcp_server.utils.schemas import WellnessEntry
 from intervals_mcp_server.utils.validation import resolve_athlete_id, resolve_date_params
 
-# Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -70,7 +69,8 @@ async def get_wellness_data(
                         format_wellness_entry(WellnessEntry.from_dict(entry_data)) + "\n\n"
                     )
                 except (TypeError, KeyError, ValueError) as e:
-                    logger.warning("Failed to format wellness entry for %s: %s", date_str, e)
+                    logger.error("Failed to format wellness entry for %s: %s", date_str, e)
+                    wellness_summary += f"[Wellness data for {date_str}: failed to format]\n\n"
     elif isinstance(result, list):
         for entry in result:
             if isinstance(entry, dict):
@@ -79,6 +79,8 @@ async def get_wellness_data(
                         format_wellness_entry(WellnessEntry.from_dict(entry)) + "\n\n"
                     )
                 except (TypeError, KeyError, ValueError) as e:
-                    logger.warning("Failed to format wellness entry: %s", e)
+                    entry_id = entry.get("id", "unknown")
+                    logger.error("Failed to format wellness entry %s: %s", entry_id, e)
+                    wellness_summary += f"[Wellness data for {entry_id}: failed to format]\n\n"
 
     return wellness_summary

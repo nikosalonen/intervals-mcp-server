@@ -781,3 +781,163 @@ def test_create_bulk_workouts_error(monkeypatch):
     )
     assert "Error creating bulk workouts" in result
     assert "Invalid workout data" in result
+
+
+# -- Error handling: visible placeholders for parse failures --
+
+
+def test_get_activities_parse_failure_shows_placeholder(monkeypatch):
+    """When an activity fails to parse, the output should contain a visible placeholder."""
+    good = {"name": "Good Ride", "id": "a1", "type": "Ride"}
+    bad = {"id": "a2", "name": "Bad"}
+
+    call_count = 0
+
+    original_from_dict = __import__(
+        "intervals_mcp_server.utils.schemas", fromlist=["Activity"]
+    ).Activity.from_dict
+
+    @classmethod  # type: ignore[misc]
+    def flaky_from_dict(cls, data):
+        nonlocal call_count
+        call_count += 1
+        if data.get("id") == "a2":
+            raise ValueError("forced parse error")
+        return original_from_dict.__func__(cls, data)
+
+    async def fake_request(*_args, **_kwargs):
+        return [good, bad]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.activities.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.activities.Activity.from_dict", flaky_from_dict)
+
+    result = asyncio.run(get_activities(athlete_id="1", limit=10, include_unnamed=True))
+    assert "Good Ride" in result
+    assert "[Activity a2: failed to format]" in result
+
+
+def test_get_events_parse_failure_shows_placeholder(monkeypatch):
+    """When an event fails to parse, the output should contain a visible placeholder."""
+    good = {"id": 1, "name": "Good Event", "start_date_local": "2024-01-01"}
+    bad = {"id": 2, "name": "Bad Event"}
+
+    original_from_dict = __import__(
+        "intervals_mcp_server.utils.schemas", fromlist=["EventResponse"]
+    ).EventResponse.from_dict
+
+    @classmethod  # type: ignore[misc]
+    def flaky_from_dict(cls, data):
+        if data.get("id") == 2:
+            raise TypeError("forced parse error")
+        return original_from_dict.__func__(cls, data)
+
+    async def fake_request(*_args, **_kwargs):
+        return [good, bad]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.events.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.events.EventResponse.from_dict", flaky_from_dict)
+
+    result = asyncio.run(get_events(athlete_id="1"))
+    assert "Good Event" in result
+    assert "[Event 2: failed to format]" in result
+
+
+def test_get_wellness_parse_failure_shows_placeholder(monkeypatch):
+    """When a wellness entry fails to parse, the output should contain a visible placeholder."""
+    good = {"id": "2024-01-01", "weight": 70}
+    bad = {"id": "2024-01-02", "weight": 80}
+
+    original_from_dict = __import__(
+        "intervals_mcp_server.utils.schemas", fromlist=["WellnessEntry"]
+    ).WellnessEntry.from_dict
+
+    @classmethod  # type: ignore[misc]
+    def flaky_from_dict(cls, data):
+        if data.get("id") == "2024-01-02":
+            raise KeyError("forced parse error")
+        return original_from_dict.__func__(cls, data)
+
+    async def fake_request(*_args, **_kwargs):
+        return [good, bad]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.wellness.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.wellness.WellnessEntry.from_dict", flaky_from_dict)
+
+    result = asyncio.run(get_wellness_data(athlete_id="1"))
+    assert "Weight: 70" in result
+    assert "[Wellness data for 2024-01-02: failed to format]" in result
+
+
+def test_get_activity_details_parse_failure_returns_error(monkeypatch):
+    """When a single activity fails to parse, a clear error message is returned."""
+    async def fake_request(*_args, **_kwargs):
+        return {"id": "a1", "name": "Bad Activity"}
+
+    @classmethod  # type: ignore[misc]
+    def bad_from_dict(cls, data):
+        raise ValueError("forced parse error")
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.activities.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.activities.Activity.from_dict", bad_from_dict)
+
+    result = asyncio.run(get_activity_details(activity_id="a1"))
+    assert "Error" in result
+    assert "a1" in result
+
+
+def test_list_workouts_parse_failure_shows_placeholder(monkeypatch):
+    """When a workout fails to parse, the output should contain a visible placeholder."""
+    good = {"id": 1, "name": "Good Workout", "type": "Ride"}
+    bad = {"id": 2, "name": "Bad Workout"}
+
+    original_from_dict = __import__(
+        "intervals_mcp_server.utils.schemas", fromlist=["Workout"]
+    ).Workout.from_dict
+
+    @classmethod  # type: ignore[misc]
+    def flaky_from_dict(cls, data):
+        if data.get("id") == 2:
+            raise ValueError("forced parse error")
+        return original_from_dict.__func__(cls, data)
+
+    async def fake_request(*_args, **_kwargs):
+        return [good, bad]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.workouts.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.workouts.Workout.from_dict", flaky_from_dict)
+
+    result = asyncio.run(list_workouts(athlete_id="1"))
+    assert "Good Workout" in result
+    assert "[Workout 2: failed to format]" in result
+
+
+def test_search_activities_parse_failure_shows_placeholder(monkeypatch):
+    """When a search result fails to parse, the output should contain a visible placeholder."""
+    good = {"id": "a1", "name": "Good"}
+    bad = {"id": "a2", "name": "Bad"}
+
+    original_from_dict = __import__(
+        "intervals_mcp_server.utils.schemas", fromlist=["Activity"]
+    ).Activity.from_dict
+
+    @classmethod  # type: ignore[misc]
+    def flaky_from_dict(cls, data):
+        if data.get("id") == "a2":
+            raise TypeError("forced parse error")
+        return original_from_dict.__func__(cls, data)
+
+    async def fake_request(*_args, **_kwargs):
+        return [good, bad]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.search.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.search.Activity.from_dict", flaky_from_dict)
+
+    result = asyncio.run(search_activities(athlete_id="1"))
+    assert "Good" in result
+    assert "[Search result a2: failed to format]" in result

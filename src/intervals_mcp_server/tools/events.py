@@ -17,7 +17,6 @@ from intervals_mcp_server.utils.schemas import EventRequest, EventResponse
 from intervals_mcp_server.utils.types import WorkoutDoc
 from intervals_mcp_server.utils.validation import resolve_athlete_id, validate_date
 
-# Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -164,7 +163,9 @@ async def get_events(
         try:
             events_summary += format_event_summary(EventResponse.from_dict(event)) + "\n\n"
         except (TypeError, KeyError, ValueError) as e:
-            logger.warning("Failed to format event: %s", e)
+            eid = event.get("id", "unknown")
+            logger.error("Failed to format event %s: %s", eid, e)
+            events_summary += f"[Event {eid}: failed to format]\n\n"
 
     return events_summary
 
@@ -206,7 +207,7 @@ async def get_event_by_id(
     try:
         return format_event_details(EventResponse.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.warning("Failed to parse event %s: %s", event_id, e)
+        logger.error("Failed to parse event %s: %s", event_id, e)
         return f"Error: Failed to parse event data for {event_id}."
 
 
@@ -217,10 +218,11 @@ async def delete_event(
     api_key: str | None = None,
 ) -> str:
     """Delete event for an athlete from Intervals.icu
+
     Args:
+        event_id: The Intervals.icu event ID
         athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
-        event_id: The Intervals.icu event ID
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
     if error_msg:
@@ -269,10 +271,10 @@ async def delete_events_by_date_range(
     """Delete events for an athlete from Intervals.icu in the specified date range.
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
-        api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
+        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
     if error_msg:
@@ -309,7 +311,7 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
     Args:
         athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
-        event_id: The Intervals.icu event ID (optional, will use event_id from .env if not provided)
+        event_id: The Intervals.icu event ID (optional). If provided, the existing event is updated; if omitted, a new event is created.
         start_date: Start date in YYYY-MM-DD format (optional, defaults to today)
         name: Name of the activity
         workout_doc: steps as a list of Step objects (optional, but necessary to define workout steps)
@@ -326,7 +328,7 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
                     {"power": {"value": "110", "units": "%ftp"}, "distance": "500", "text": "High-intensity"},
                     {"power": {"value": "80", "units": "%ftp"}, "duration": "90", "text": "Recovery"}
                 ]},
-                {"power": {"value": "80", "units": "%ftp"}, "duration": "600", "cooldown": true}
+                {"power": {"value": "80", "units": "%ftp"}, "duration": "600", "cooldown": true},
                 {"text": ""}, # Add comments or blank lines for readability
             ]
         }

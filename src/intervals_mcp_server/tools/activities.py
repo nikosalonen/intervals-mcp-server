@@ -14,7 +14,6 @@ from intervals_mcp_server.utils.formatting import format_activity_message, forma
 from intervals_mcp_server.utils.schemas import Activity, ActivityMessage, IntervalsData
 from intervals_mcp_server.utils.validation import resolve_athlete_id, resolve_date_params
 
-# Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -92,14 +91,15 @@ def _format_activities_response(
             )
         return f"No named activities found for athlete {athlete_id} in the specified date range. Try with include_unnamed=True to see all activities."
 
-    # Format the output
     activities_summary = "Activities:\n\n"
     for activity in activities:
         if isinstance(activity, dict):
             try:
                 activities_summary += format_activity_summary(Activity.from_dict(activity)) + "\n"
             except (TypeError, KeyError, ValueError) as e:
-                logger.warning("Failed to format activity: %s", e)
+                aid = activity.get("id", "unknown")
+                logger.error("Failed to format activity %s: %s", aid, e)
+                activities_summary += f"[Activity {aid}: failed to format]\n"
         else:
             activities_summary += f"Invalid activity format: {activity}\n\n"
 
@@ -200,7 +200,7 @@ async def get_activity_details(activity_id: str, api_key: str | None = None) -> 
     try:
         detailed_view = format_activity_summary(Activity.from_dict(activity_data))
     except (TypeError, KeyError, ValueError) as e:
-        logger.warning("Failed to parse activity %s: %s", activity_id, e)
+        logger.error("Failed to parse activity %s: %s", activity_id, e)
         return f"Error: Failed to parse activity data for {activity_id}."
 
     # Add additional details if available
@@ -249,7 +249,7 @@ async def get_activity_intervals(activity_id: str, api_key: str | None = None) -
     try:
         return format_intervals(IntervalsData.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.warning("Failed to parse intervals for %s: %s", activity_id, e)
+        logger.error("Failed to parse intervals for %s: %s", activity_id, e)
         return f"Error: Failed to parse interval data for activity {activity_id}."
 
 
@@ -361,7 +361,8 @@ async def get_activity_messages(activity_id: str, api_key: str | None = None) ->
             try:
                 output += format_activity_message(ActivityMessage.from_dict(msg)) + "\n\n"
             except (TypeError, KeyError, ValueError) as e:
-                logger.warning("Failed to format message: %s", e)
+                logger.error("Failed to format message: %s", e)
+                output += "[Message could not be displayed]\n\n"
 
     return output
 
