@@ -4,6 +4,8 @@ Athlete profile and sport settings MCP tools for Intervals.icu.
 This module contains tools for retrieving athlete profile and sport settings (FTP, zones, etc.).
 """
 
+import logging
+
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.formatting import format_athlete_summary, format_sport_settings
@@ -13,6 +15,7 @@ from intervals_mcp_server.utils.validation import resolve_athlete_id
 # Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
+logger = logging.getLogger(__name__)
 config = get_config()
 
 

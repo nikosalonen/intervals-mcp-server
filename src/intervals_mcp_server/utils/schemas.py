@@ -6,14 +6,39 @@ Only fields accessed by the MCP tools and formatters are included.
 """
 
 import json
+import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
+
+from intervals_mcp_server.utils.types import WorkoutDoc
+
+logger = logging.getLogger(__name__)
 
 
 def _first(*values: Any) -> Any:
     """Return the first non-None value from the arguments."""
     return next((v for v in values if v is not None), None)
+
+
+def _get_list(data: dict[str, Any], *keys: str) -> list[Any]:
+    """Get the first list value found for the given keys, ignoring non-list values."""
+    for key in keys:
+        val = data.get(key)
+        if isinstance(val, list):
+            return val
+    return []
+
+
+def _dict_items(items: list[Any], context: str = "") -> list[dict[str, Any]]:
+    """Filter a list to only dict items, logging any skipped non-dict entries."""
+    result: list[dict[str, Any]] = []
+    for item in items:
+        if isinstance(item, dict):
+            result.append(item)
+        elif item is not None:
+            logger.debug("Skipped non-dict item (type=%s) in %s", type(item).__name__, context)
+    return result
 
 
 # ── Enums ──────────────────────────────────────────────────────────────────

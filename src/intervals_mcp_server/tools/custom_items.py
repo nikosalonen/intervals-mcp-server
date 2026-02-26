@@ -5,6 +5,7 @@ This module contains tools for managing athlete custom items (charts, fields, zo
 """
 
 import json
+import logging
 from typing import Any
 
 from intervals_mcp_server.api.client import make_intervals_request
@@ -16,6 +17,7 @@ from intervals_mcp_server.utils.validation import resolve_athlete_id
 # Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
+logger = logging.getLogger(__name__)
 config = get_config()
 
 

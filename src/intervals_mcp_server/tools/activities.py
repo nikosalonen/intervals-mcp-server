@@ -4,6 +4,7 @@ Activity-related MCP tools for Intervals.icu.
 This module contains tools for retrieving and managing athlete activities.
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -16,6 +17,7 @@ from intervals_mcp_server.utils.validation import resolve_athlete_id, resolve_da
 # Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
+logger = logging.getLogger(__name__)
 config = get_config()
 
 

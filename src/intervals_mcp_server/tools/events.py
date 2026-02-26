@@ -5,6 +5,7 @@ This module contains tools for retrieving, creating, updating, and deleting athl
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -19,6 +20,7 @@ from intervals_mcp_server.utils.validation import resolve_athlete_id, validate_d
 # Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
 
+logger = logging.getLogger(__name__)
 config = get_config()
 
 

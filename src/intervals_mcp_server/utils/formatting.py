@@ -5,6 +5,7 @@ This module contains formatting functions for handling data from the Intervals.i
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -21,6 +22,8 @@ from intervals_mcp_server.utils.schemas import (
     WellnessEntry,
     Workout,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _fmt(val: Any, default: str = "N/A") -> Any:
