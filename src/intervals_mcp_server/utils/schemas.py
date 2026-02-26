@@ -509,13 +509,11 @@ class IntervalsData:
             analyzed=data.get("analyzed"),
             icu_intervals=[
                 ActivityInterval.from_dict(i)
-                for i in data.get("icu_intervals") or []
-                if isinstance(i, dict)
+                for i in _dict_items(data.get("icu_intervals") or [], "icu_intervals")
             ],
             icu_groups=[
                 ActivityIntervalGroup.from_dict(g)
-                for g in data.get("icu_groups") or []
-                if isinstance(g, dict)
+                for g in _dict_items(data.get("icu_groups") or [], "icu_groups")
             ],
         )
 
@@ -611,8 +609,7 @@ class WellnessEntry:
             atl_load=data.get("atlLoad"),
             sport_info=[
                 WellnessSportInfo.from_dict(s)
-                for s in data.get("sportInfo") or []
-                if isinstance(s, dict)
+                for s in _dict_items(data.get("sportInfo") or [], "sportInfo")
             ],
             weight=data.get("weight"),
             resting_hr=_first(data.get("restingHR"), data.get("restingHr")),
@@ -703,9 +700,9 @@ class AthleteSportSettings:
             ftp=data.get("ftp"),
             lthr=data.get("lthr"),
             max_hr=_first(data.get("max_hr"), data.get("maxHr")),
-            power_zones=data.get("power_zones") or data.get("zones") or data.get("powerZones") or [],
-            hr_zones=data.get("hr_zones") or [],
-            pace_zones=data.get("pace_zones") or data.get("paceZones") or [],
+            power_zones=_get_list(data, "power_zones", "zones", "powerZones"),
+            hr_zones=_get_list(data, "hr_zones"),
+            pace_zones=_get_list(data, "pace_zones", "paceZones"),
             warmup_time=_first(data.get("warmup_time"), data.get("warmup")),
             cooldown_time=_first(data.get("cooldown_time"), data.get("cooldown")),
         )
@@ -847,7 +844,7 @@ class Folder:
             type=data.get("type"),
             description=data.get("description"),
             workouts=[
-                Workout.from_dict(w) for w in raw_workouts if isinstance(w, dict)
+                Workout.from_dict(w) for w in _dict_items(raw_workouts, "workouts")
             ],
         )
 
