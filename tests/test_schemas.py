@@ -5,20 +5,28 @@ Tests verify that from_dict() correctly maps API response fields (including came
 aliases) to typed dataclass attributes, and that to_dict() produces valid request bodies.
 """
 
+import pytest
+
 from intervals_mcp_server.utils.schemas import (
     Activity,
     ActivityInterval,
+    ActivityIntervalGroup,
     ActivityMessage,
     AthleteSportSettings,
     Athlete,
     CustomItem,
+    EventCategory,
     EventRequest,
     EventResponse,
     EventWorkout,
     Folder,
     IntervalsData,
     WellnessEntry,
+    WellnessSportInfo,
     Workout,
+    _dict_items,
+    _first,
+    _get_list,
 )
 
 
@@ -381,3 +389,229 @@ def test_activity_message_from_dict():
     assert msg.created == "2024-07-01T10:00:00Z"
     assert msg.type == "NOTE"
     assert msg.content == "Great effort!"
+
+
+# ── Helper function tests ────────────────────────────────────────────────
+
+
+def test_first_returns_first_non_none():
+    """_first() returns the first non-None value."""
+    assert _first(None, None, 42) == 42
+    assert _first("a", "b") == "a"
+    assert _first(None) is None
+    assert _first() is None
+
+
+def test_first_preserves_falsy_non_none():
+    """_first() treats 0, empty string, and False as valid (not None)."""
+    assert _first(0, 100) == 0
+    assert _first("", "fallback") == ""
+    assert _first(False, True) is False
+
+
+def test_get_list_returns_first_list():
+    """_get_list() returns the first list value found for the given keys."""
+    data = {"a": "not_a_list", "b": [1, 2, 3], "c": [4, 5]}
+    assert _get_list(data, "a", "b", "c") == [1, 2, 3]
+
+
+def test_get_list_returns_empty_on_no_match():
+    """_get_list() returns [] when no key has a list value."""
+    assert _get_list({"a": "string"}, "a", "b") == []
+    assert _get_list({}, "a") == []
+
+
+def test_get_list_ignores_non_list_truthy():
+    """_get_list() ignores non-list truthy values like strings and dicts."""
+    data = {"zones": "default", "powerZones": {"z1": 100}}
+    assert _get_list(data, "zones", "powerZones") == []
+
+
+def test_dict_items_filters_non_dicts():
+    """_dict_items() returns only dict items from a mixed list."""
+    items = [{"a": 1}, None, "garbage", 42, {"b": 2}]
+    result = _dict_items(items, "test")
+    assert result == [{"a": 1}, {"b": 2}]
+
+
+def test_dict_items_empty_list():
+    """_dict_items() returns [] for empty input."""
+    assert _dict_items([], "test") == []
+
+
+# ── from_dict({}) empty dict tests ───────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "cls",
+    [
+        Activity,
+        ActivityInterval,
+        ActivityIntervalGroup,
+        IntervalsData,
+        ActivityMessage,
+        WellnessSportInfo,
+        WellnessEntry,
+        Athlete,
+        AthleteSportSettings,
+        CustomItem,
+        Workout,
+        Folder,
+        EventWorkout,
+        EventResponse,
+    ],
+)
+def test_from_dict_empty(cls):
+    """All schema from_dict() methods handle an empty dict gracefully."""
+    obj = cls.from_dict({})
+    assert obj is not None
+
+
+# ── Non-dict filtering tests ─────────────────────────────────────────────
+
+
+def test_intervals_data_filters_non_dict_entries():
+    """IntervalsData.from_dict() silently filters non-dict items in intervals/groups."""
+    data = {
+        "id": "act1",
+        "icu_intervals": [{"label": "Rep 1", "type": "work"}, None, "garbage", 42],
+        "icu_groups": [None, {"id": "g1", "count": 2}],
+    }
+    result = IntervalsData.from_dict(data)
+    assert len(result.icu_intervals) == 1
+    assert result.icu_intervals[0].label == "Rep 1"
+    assert len(result.icu_groups) == 1
+    assert result.icu_groups[0].id == "g1"
+
+
+def test_wellness_entry_filters_non_dict_sport_info():
+    """WellnessEntry.from_dict() filters non-dict items in sportInfo."""
+    data = {"sportInfo": [{"type": "Ride", "eftp": 280}, None, "bad"]}
+    entry = WellnessEntry.from_dict(data)
+    assert len(entry.sport_info) == 1
+    assert entry.sport_info[0].type == "Ride"
+
+
+def test_folder_filters_non_dict_workouts():
+    """Folder.from_dict() filters non-dict items in workouts."""
+    data = {
+        "id": 1,
+        "name": "Test",
+        "workouts": [{"id": 1, "name": "W1"}, None, 42],
+    }
+    folder = Folder.from_dict(data)
+    assert len(folder.workouts) == 1
+    assert folder.workouts[0].name == "W1"
+
+
+# ── EventRequest defaults ────────────────────────────────────────────────
+
+
+def test_event_request_defaults():
+    """EventRequest uses correct default values for category and type."""
+    req = EventRequest(start_date_local="2024-01-01T00:00:00", name="Test")
+    assert req.category == EventCategory.WORKOUT
+    assert req.type == "Ride"
+    d = req.to_dict()
+    assert d["category"] == "WORKOUT"
+    assert d["type"] == "Ride"
+
+
+def test_event_request_distance_accepts_float():
+    """EventRequest.distance field accepts float values."""
+    req = EventRequest(
+        start_date_local="2024-01-01T00:00:00",
+        name="Test",
+        distance=42195.5,
+    )
+    d = req.to_dict()
+    assert d["distance"] == 42195.5
+
+
+# ── Workout to_dict / to_json ────────────────────────────────────────────
+
+
+def test_workout_to_dict_includes_tags():
+    """Workout.to_dict() includes non-empty tags."""
+    w = Workout(name="Test", tags=["base", "indoor"])
+    d = w.to_dict()
+    assert d["tags"] == ["base", "indoor"]
+
+
+def test_workout_to_dict_omits_empty_tags():
+    """Workout.to_dict() omits empty tags list."""
+    w = Workout(name="Test", tags=[])
+    d = w.to_dict()
+    assert "tags" not in d
+
+
+def test_workout_to_json():
+    """Workout.to_json() produces valid JSON string."""
+    w = Workout(name="Test", type="Ride")
+    j = w.to_json()
+    assert '"name": "Test"' in j
+    assert '"type": "Ride"' in j
+
+
+def test_workout_workout_doc_round_trip():
+    """Workout.from_dict() parses workout_doc and to_dict() serializes it back."""
+    from intervals_mcp_server.utils.types import WorkoutDoc
+
+    data = {
+        "id": 1,
+        "name": "Intervals",
+        "workout_doc": {"description": "Hard ride", "duration": 3600},
+    }
+    w = Workout.from_dict(data)
+    assert isinstance(w.workout_doc, WorkoutDoc)
+    assert w.workout_doc.description == "Hard ride"
+    assert w.workout_doc.duration == 3600
+
+    d = w.to_dict()
+    assert d["workout_doc"]["description"] == "Hard ride"
+    assert d["workout_doc"]["duration"] == 3600
+
+
+def test_workout_from_dict_camel_case_workout_doc():
+    """Workout.from_dict() also accepts camelCase 'workoutDoc' key."""
+    data = {"name": "Test", "workoutDoc": {"description": "Test doc"}}
+    w = Workout.from_dict(data)
+    assert w.workout_doc is not None
+    assert w.workout_doc.description == "Test doc"
+
+
+# ── Folder children alias ────────────────────────────────────────────────
+
+
+def test_folder_from_dict_children_alias():
+    """Folder.from_dict() accepts 'children' as alias for 'workouts'."""
+    data = {
+        "id": 5,
+        "name": "Folder",
+        "children": [{"id": 1, "name": "Child Workout"}],
+    }
+    folder = Folder.from_dict(data)
+    assert len(folder.workouts) == 1
+    assert folder.workouts[0].name == "Child Workout"
+
+
+# ── CustomItem to_dict round-trip ────────────────────────────────────────
+
+
+def test_custom_item_to_dict_includes_all_set_fields():
+    """CustomItem.to_dict() includes all non-None fields."""
+    item = CustomItem(
+        name="Chart",
+        type="FITNESS_CHART",
+        description="My chart",
+        visibility="PRIVATE",
+        content={"key": "val"},
+    )
+    d = item.to_dict()
+    assert d == {
+        "name": "Chart",
+        "type": "FITNESS_CHART",
+        "description": "My chart",
+        "visibility": "PRIVATE",
+        "content": {"key": "val"},
+    }
