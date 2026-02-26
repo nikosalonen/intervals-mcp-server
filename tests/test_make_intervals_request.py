@@ -17,6 +17,8 @@ os.environ.setdefault("API_KEY", "test")
 os.environ.setdefault("ATHLETE_ID", "i1")
 
 from intervals_mcp_server import server  # pylint: disable=wrong-import-position
+from intervals_mcp_server.api import client as api_client  # pylint: disable=wrong-import-position
+from intervals_mcp_server.config import Config  # pylint: disable=wrong-import-position
 
 
 class MockBadJSONResponse:
@@ -73,6 +75,16 @@ def test_make_intervals_request_bad_json(monkeypatch, caplog):
     Ensures proper logging and error message content.
     """
     monkeypatch.setattr(server, "httpx_client", MockAsyncClient())
+    monkeypatch.setattr(
+        api_client,
+        "get_config",
+        lambda: Config(
+            api_key="test",
+            athlete_id="i1",
+            intervals_api_base_url="https://intervals.icu/api/v1",
+            user_agent="test-agent",
+        ),
+    )
 
     with caplog.at_level(logging.ERROR):
         result = asyncio.run(server.make_intervals_request("/bad"))
