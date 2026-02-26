@@ -340,6 +340,20 @@ def test_add_activity_message(monkeypatch):
     assert "42" in result
 
 
+def test_add_activity_message_unexpected_response(monkeypatch):
+    """Test add_activity_message handles unexpected non-dict response."""
+
+    async def fake_request(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.activities.make_intervals_request", fake_request
+    )
+    result = asyncio.run(add_activity_message(activity_id="i123", content="Hello"))
+    assert "Unexpected response" in result
+
+
 def test_add_activity_message_error(monkeypatch):
     """Test add_activity_message handles API errors."""
 
