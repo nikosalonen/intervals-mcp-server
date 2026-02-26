@@ -51,12 +51,13 @@ async def search_activities(
         return f"Error searching activities: {result.get('message', 'Unknown error')}"
 
     activities = result if isinstance(result, list) else []
-    if not activities:
+    formatted = [
+        format_search_result(Activity.from_dict(a)) for a in activities if isinstance(a, dict)
+    ]
+    if not formatted:
         return "No activities found."
 
-    return "Search results:\n\n" + "\n".join(
-        format_search_result(Activity.from_dict(a)) for a in activities if isinstance(a, dict)
-    )
+    return "Search results:\n\n" + "\n".join(formatted)
 
 
 @mcp.tool()
@@ -110,9 +111,10 @@ async def search_intervals(
         return f"Error searching intervals: {result.get('message', 'Unknown error')}"
 
     activities = result if isinstance(result, list) else []
-    if not activities:
+    formatted = [
+        format_search_result(Activity.from_dict(a)) for a in activities if isinstance(a, dict)
+    ]
+    if not formatted:
         return "No activities found with matching intervals."
 
-    return "Interval search results:\n\n" + "\n".join(
-        format_search_result(Activity.from_dict(a)) for a in activities if isinstance(a, dict)
-    )
+    return "Interval search results:\n\n" + "\n".join(formatted)

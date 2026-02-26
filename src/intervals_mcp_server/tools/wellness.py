@@ -61,9 +61,8 @@ async def get_wellness_data(
         for date_str, data in result.items():
             if isinstance(data, dict):
                 # Ensure the date key is set so WellnessEntry.id is populated
-                if "id" not in data:
-                    data["id"] = date_str
-                wellness_summary += format_wellness_entry(WellnessEntry.from_dict(data)) + "\n\n"
+                entry_data = data if "id" in data else {**data, "id": date_str}
+                wellness_summary += format_wellness_entry(WellnessEntry.from_dict(entry_data)) + "\n\n"
     elif isinstance(result, list):
         for entry in result:
             if isinstance(entry, dict):
