@@ -161,7 +161,10 @@ async def get_events(
         if not isinstance(event, dict):
             continue
 
-        events_summary += format_event_summary(EventResponse.from_dict(event)) + "\n\n"
+        try:
+            events_summary += format_event_summary(EventResponse.from_dict(event)) + "\n\n"
+        except (TypeError, KeyError, ValueError) as e:
+            logger.warning("Failed to format event: %s", e)
 
     return events_summary
 
@@ -200,7 +203,11 @@ async def get_event_by_id(
     if not isinstance(result, dict):
         return f"Invalid event format for event {event_id}."
 
-    return format_event_details(EventResponse.from_dict(result))
+    try:
+        return format_event_details(EventResponse.from_dict(result))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.warning("Failed to parse event %s: %s", event_id, e)
+        return f"Error: Failed to parse event data for {event_id}."
 
 
 @mcp.tool()
