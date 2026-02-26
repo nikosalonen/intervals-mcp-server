@@ -22,6 +22,20 @@ from intervals_mcp_server.tools.events import (  # noqa: F401
     get_events,
 )
 from intervals_mcp_server.tools.wellness import get_wellness_data  # noqa: F401
+from intervals_mcp_server.tools.custom_items import (  # noqa: F401
+    create_custom_item,
+    delete_custom_item,
+    get_custom_item_by_id,
+    get_custom_items,
+    update_custom_item,
+)
+from intervals_mcp_server.tools.athlete import get_athlete, get_sport_settings  # noqa: F401
+from intervals_mcp_server.tools.search import search_activities, search_intervals  # noqa: F401
+from intervals_mcp_server.tools.workouts import (  # noqa: F401
+    create_bulk_workouts,
+    list_folders,
+    list_workouts,
+)
 
 
 def register_tools(mcp_instance: FastMCP) -> None:
@@ -52,4 +66,16 @@ __all__ = [
     "delete_events_by_date_range",
     "add_or_update_event",
     "get_wellness_data",
+    "get_custom_items",
+    "get_custom_item_by_id",
+    "create_custom_item",
+    "update_custom_item",
+    "delete_custom_item",
+    "get_athlete",
+    "get_sport_settings",
+    "search_activities",
+    "search_intervals",
+    "list_workouts",
+    "list_folders",
+    "create_bulk_workouts",
 ]
