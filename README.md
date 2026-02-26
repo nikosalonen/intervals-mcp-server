@@ -2,8 +2,6 @@
 
 Model Context Protocol (MCP) server for connecting Claude and ChatGPT with the Intervals.icu API. It provides tools for authentication and data retrieval for activities, events, and wellness data.
 
-If you find the Model Context Protocol (MCP) server useful, please consider supporting its continued development with a donation.
-
 ## Requirements
 
 - Python 3.12 or higher
@@ -22,7 +20,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ### 2. Clone this repository
 
 ```bash
-git clone https://github.com/mvilanova/intervals-mcp-server.git
+git clone https://github.com/nikosalonen/intervals-mcp-server.git
 cd intervals-mcp-server
 ```
 
@@ -211,10 +209,6 @@ mcp run src/intervals_mcp_server/server.py
 
 The GNU General Public License v3.0
 
-## Featured
+## Acknowledgments
 
-### Glama.ai
-
-<a href="https://glama.ai/mcp/servers/@mvilanova/intervals-mcp-server">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@mvilanova/intervals-mcp-server/badge" alt="Intervals.icu Server MCP server" />
-</a>
+Originally created by [Marc Vilanova](https://github.com/mvilanova).
