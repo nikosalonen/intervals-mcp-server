@@ -40,7 +40,7 @@ def _fmt_datetime(value: str | None) -> str:
             dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
             return dt.strftime("%Y-%m-%d %H:%M:%S")
         except ValueError:
-            logger.debug("Failed to parse datetime: %s", value)
+            logger.warning("Failed to parse datetime: %s", value)
     return value
 
 
