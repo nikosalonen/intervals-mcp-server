@@ -5,6 +5,8 @@ This module contains tools for searching activities by name/tag and by interval 
 """
 
 import logging
+from collections.abc import Sequence
+from typing import Any
 
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
@@ -16,6 +18,22 @@ from intervals_mcp_server.mcp_instance import mcp
 
 logger = logging.getLogger(__name__)
 config = get_config()
+
+
+def _parse_and_format_activities(activities: Sequence[Any]) -> list[str]:
+    """Parse raw activity dicts and format them as search result strings."""
+    formatted: list[str] = []
+    for a in activities:
+        if isinstance(a, dict):
+            try:
+                activity = Activity.from_dict(a)
+                if activity.id is not None or activity.name is not None:
+                    formatted.append(format_search_result(activity))
+            except (TypeError, KeyError, ValueError) as e:
+                aid = a.get("id", "unknown")
+                logger.error("Failed to format search result %s: %s", aid, e, exc_info=True)
+                formatted.append(f"[Search result {aid}: failed to format]")
+    return formatted
 
 
 @mcp.tool()
@@ -53,17 +71,7 @@ async def search_activities(
         return f"Error searching activities: {result.get('message', 'Unknown error')}"
 
     activities = result if isinstance(result, list) else []
-    formatted = []
-    for a in activities:
-        if isinstance(a, dict):
-            try:
-                activity = Activity.from_dict(a)
-                if activity.id is not None or activity.name is not None:
-                    formatted.append(format_search_result(activity))
-            except (TypeError, KeyError, ValueError) as e:
-                aid = a.get("id", "unknown")
-                logger.error("Failed to format search result %s: %s", aid, e, exc_info=True)
-                formatted.append(f"[Search result {aid}: failed to format]")
+    formatted = _parse_and_format_activities(activities)
     if not formatted:
         return "No activities found."
 
@@ -121,17 +129,7 @@ async def search_intervals(
         return f"Error searching intervals: {result.get('message', 'Unknown error')}"
 
     activities = result if isinstance(result, list) else []
-    formatted = []
-    for a in activities:
-        if isinstance(a, dict):
-            try:
-                activity = Activity.from_dict(a)
-                if activity.id is not None or activity.name is not None:
-                    formatted.append(format_search_result(activity))
-            except (TypeError, KeyError, ValueError) as e:
-                aid = a.get("id", "unknown")
-                logger.error("Failed to format interval search result %s: %s", aid, e, exc_info=True)
-                formatted.append(f"[Search result {aid}: failed to format]")
+    formatted = _parse_and_format_activities(activities)
     if not formatted:
         return "No activities found with matching intervals."
 
