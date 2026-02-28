@@ -202,7 +202,7 @@ class SportType(StrEnum):
 # ── Dataclasses ───────────────────────────────────────────────────────────
 
 
-@dataclass
+@dataclass(frozen=True)
 class Activity:
     """Athlete activity response from the Intervals.icu API.
 
@@ -339,7 +339,7 @@ class Activity:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class ActivityInterval:
     """A single interval from the icu_intervals array in the intervals response."""
 
@@ -465,7 +465,7 @@ class ActivityInterval:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class ActivityIntervalGroup:
     """A group of intervals from the icu_groups array in the intervals response."""
 
@@ -511,7 +511,7 @@ class ActivityIntervalGroup:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class IntervalsData:
     """Top-level intervals response containing individual intervals and groups."""
 
@@ -537,7 +537,7 @@ class IntervalsData:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class ActivityMessage:
     """A message or note attached to an activity."""
 
@@ -557,7 +557,7 @@ class ActivityMessage:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class WellnessSportInfo:
     """Sport-specific info entry nested inside a WellnessEntry."""
 
@@ -570,7 +570,7 @@ class WellnessSportInfo:
         return cls(type=data.get("type"), eftp=data.get("eftp"))
 
 
-@dataclass
+@dataclass(frozen=True)
 class WellnessEntry:
     """Wellness data entry for a single day."""
 
@@ -667,7 +667,7 @@ class WellnessEntry:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class Athlete:
     """Athlete profile — fields used by the get_athlete tool and formatter."""
 
@@ -693,11 +693,11 @@ class Athlete:
             ),
             location=data.get("location") or data.get("city"),
             timezone=data.get("timezone"),
-            status=data.get("status"),
+            status=_safe_enum(AthleteStatus, data.get("status")),
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class AthleteSportSettings:
     """Athlete sport settings — FTP, zones, LTHR, pacing, warmup/cooldown."""
 
@@ -844,7 +844,7 @@ class Workout:
         return json.dumps(self.to_dict())
 
 
-@dataclass
+@dataclass(frozen=True)
 class Folder:
     """Workout folder from the Intervals.icu API."""
 
@@ -869,7 +869,7 @@ class Folder:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class EventWorkout:
     """Nested workout object inside an event response (EventEx)."""
 
@@ -893,7 +893,7 @@ class EventWorkout:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class EventResponse:
     """Event response from the Intervals.icu API (Event / EventEx)."""
 
