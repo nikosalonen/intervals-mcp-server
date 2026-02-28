@@ -39,6 +39,16 @@ def _normalize_tags(raw: Any) -> list[str]:
     return [str(raw)]
 
 
+def _safe_enum(enum_cls: type[StrEnum], value: Any) -> str | None:
+    """Try to parse a value as a StrEnum member, falling back to the raw string."""
+    if value is None:
+        return None
+    try:
+        return enum_cls(value)
+    except ValueError:
+        return str(value)
+
+
 def _dict_items(items: list[Any], context: str = "") -> list[dict[str, Any]]:
     """Filter a list to only dict items, logging any skipped non-dict entries."""
     result: list[dict[str, Any]] = []
