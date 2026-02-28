@@ -273,6 +273,19 @@ def test_event_workout_from_dict_aliases():
     assert w.icu_training_load == 60
 
 
+def test_event_workout_filters_non_dict_intervals():
+    """EventWorkout.from_dict() filters non-dict items from intervals list."""
+    data = {
+        "id": 1,
+        "type": "Ride",
+        "intervals": [{"type": "warmup"}, None, "garbage", 42, {"type": "work"}],
+    }
+    w = EventWorkout.from_dict(data)
+    assert len(w.intervals) == 2
+    assert w.intervals[0]["type"] == "warmup"
+    assert w.intervals[1]["type"] == "work"
+
+
 def test_event_request_to_dict():
     """EventRequest.to_dict() produces correct API request body."""
     req = EventRequest(

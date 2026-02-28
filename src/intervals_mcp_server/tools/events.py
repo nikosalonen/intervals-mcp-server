@@ -506,7 +506,7 @@ async def create_bulk_events(
         params=params,
     )
 
-    if isinstance(result, dict) and result.get("error"):
+    if isinstance(result, dict) and "error" in result:
         return f"Error creating bulk events: {result.get('message', 'Unknown error')}"
 
     created = result if isinstance(result, list) else []

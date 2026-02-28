@@ -949,16 +949,12 @@ def test_get_activities_parse_failure_shows_placeholder(monkeypatch):
     good = {"name": "Good Ride", "id": "a1", "type": "Ride"}
     bad = {"id": "a2", "name": "Bad"}
 
-    call_count = 0
-
     original_from_dict = __import__(
         "intervals_mcp_server.utils.schemas", fromlist=["Activity"]
     ).Activity.from_dict
 
     @classmethod  # type: ignore[misc]
     def flaky_from_dict(cls, data):
-        nonlocal call_count
-        call_count += 1
         if data.get("id") == "a2":
             raise ValueError("forced parse error")
         return original_from_dict.__func__(cls, data)
