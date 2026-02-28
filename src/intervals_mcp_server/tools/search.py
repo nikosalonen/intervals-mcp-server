@@ -62,7 +62,7 @@ async def search_activities(
                     formatted.append(format_search_result(activity))
             except (TypeError, KeyError, ValueError) as e:
                 aid = a.get("id", "unknown")
-                logger.error("Failed to format search result %s: %s", aid, e)
+                logger.error("Failed to format search result %s: %s", aid, e, exc_info=True)
                 formatted.append(f"[Search result {aid}: failed to format]")
     if not formatted:
         return "No activities found."
@@ -130,7 +130,7 @@ async def search_intervals(
                     formatted.append(format_search_result(activity))
             except (TypeError, KeyError, ValueError) as e:
                 aid = a.get("id", "unknown")
-                logger.error("Failed to format interval search result %s: %s", aid, e)
+                logger.error("Failed to format interval search result %s: %s", aid, e, exc_info=True)
                 formatted.append(f"[Search result {aid}: failed to format]")
     if not formatted:
         return "No activities found with matching intervals."

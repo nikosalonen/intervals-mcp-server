@@ -164,7 +164,7 @@ async def get_events(
             events_summary += format_event_summary(EventResponse.from_dict(event)) + "\n\n"
         except (TypeError, KeyError, ValueError) as e:
             eid = event.get("id", "unknown")
-            logger.error("Failed to format event %s: %s", eid, e)
+            logger.error("Failed to format event %s: %s", eid, e, exc_info=True)
             events_summary += f"[Event {eid}: failed to format]\n\n"
 
     return events_summary
@@ -207,7 +207,7 @@ async def get_event_by_id(
     try:
         return format_event_details(EventResponse.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.error("Failed to parse event %s: %s", event_id, e)
+        logger.error("Failed to parse event %s: %s", event_id, e, exc_info=True)
         return f"Error: Failed to parse event data for {event_id}."
 
 

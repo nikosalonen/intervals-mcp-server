@@ -47,7 +47,7 @@ async def get_athlete(
     try:
         return format_athlete_summary(Athlete.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.error("Failed to parse athlete data: %s", e)
+        logger.error("Failed to parse athlete data: %s", e, exc_info=True)
         return "Error: Failed to parse athlete data."
 
 
@@ -85,7 +85,7 @@ async def get_sport_settings(
         try:
             return format_sport_settings(AthleteSportSettings.from_dict(result))
         except (TypeError, KeyError, ValueError) as e:
-            logger.error("Failed to parse sport settings: %s", e)
+            logger.error("Failed to parse sport settings: %s", e, exc_info=True)
             return "Error: Failed to parse sport settings."
 
     # All sports: result is a list or dict of sport settings
@@ -101,6 +101,6 @@ async def get_sport_settings(
                 formatted.append(format_sport_settings(AthleteSportSettings.from_dict(s)))
             except (TypeError, KeyError, ValueError) as e:
                 sport_name = s.get("type", "Unknown")
-                logger.error("Failed to format sport setting for %s: %s", sport_name, e)
+                logger.error("Failed to format sport setting for %s: %s", sport_name, e, exc_info=True)
                 formatted.append(f"[Sport setting '{sport_name}': failed to format]")
     return "\n\n---\n\n".join(formatted) if formatted else "No sport settings found."

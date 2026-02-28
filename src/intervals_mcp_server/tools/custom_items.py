@@ -87,7 +87,7 @@ async def get_custom_item_by_id(
     try:
         return format_custom_item_details(CustomItem.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.error("Failed to parse custom item %s: %s", item_id, e)
+        logger.error("Failed to parse custom item %s: %s", item_id, e, exc_info=True)
         return f"Error: Failed to parse custom item data for {item_id}."
 
 
@@ -147,7 +147,7 @@ async def create_custom_item(
     try:
         details = format_custom_item_details(CustomItem.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.error("Failed to format created custom item: %s", e)
+        logger.error("Failed to format created custom item: %s", e, exc_info=True)
         return f"Custom item created (ID: {result.get('id', 'unknown')}), but failed to format response."
     return f"Successfully created custom item:\n\n{details}"
 
@@ -214,7 +214,7 @@ async def update_custom_item(
     try:
         details = format_custom_item_details(CustomItem.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.error("Failed to format updated custom item: %s", e)
+        logger.error("Failed to format updated custom item: %s", e, exc_info=True)
         return f"Custom item updated (ID: {result.get('id', 'unknown')}), but failed to format response."
     return f"Successfully updated custom item:\n\n{details}"
 

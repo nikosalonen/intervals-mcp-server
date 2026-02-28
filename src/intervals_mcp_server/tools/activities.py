@@ -98,7 +98,7 @@ def _format_activities_response(
                 activities_summary += format_activity_summary(Activity.from_dict(activity)) + "\n"
             except (TypeError, KeyError, ValueError) as e:
                 aid = activity.get("id", "unknown")
-                logger.error("Failed to format activity %s: %s", aid, e)
+                logger.error("Failed to format activity %s: %s", aid, e, exc_info=True)
                 activities_summary += f"[Activity {aid}: failed to format]\n"
         else:
             activities_summary += f"Invalid activity format: {activity}\n\n"
@@ -200,7 +200,7 @@ async def get_activity_details(activity_id: str, api_key: str | None = None) -> 
     try:
         detailed_view = format_activity_summary(Activity.from_dict(activity_data))
     except (TypeError, KeyError, ValueError) as e:
-        logger.error("Failed to parse activity %s: %s", activity_id, e)
+        logger.error("Failed to parse activity %s: %s", activity_id, e, exc_info=True)
         return f"Error: Failed to parse activity data for {activity_id}."
 
     # Add additional details if available
@@ -249,7 +249,7 @@ async def get_activity_intervals(activity_id: str, api_key: str | None = None) -
     try:
         return format_intervals(IntervalsData.from_dict(result))
     except (TypeError, KeyError, ValueError) as e:
-        logger.error("Failed to parse intervals for %s: %s", activity_id, e)
+        logger.error("Failed to parse intervals for %s: %s", activity_id, e, exc_info=True)
         return f"Error: Failed to parse interval data for activity {activity_id}."
 
 
@@ -363,7 +363,7 @@ async def get_activity_messages(activity_id: str, api_key: str | None = None) ->
                 output += format_activity_message(ActivityMessage.from_dict(msg)) + "\n\n"
                 appended_count += 1
             except (TypeError, KeyError, ValueError) as e:
-                logger.error("Failed to format message: %s", e)
+                logger.error("Failed to format message: %s", e, exc_info=True)
                 output += "[Message could not be displayed]\n\n"
                 appended_count += 1
 

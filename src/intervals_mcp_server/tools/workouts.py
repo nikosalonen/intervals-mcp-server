@@ -52,7 +52,7 @@ async def list_workouts(
                 formatted.append(format_workout(Workout.from_dict(w)).strip())
             except (TypeError, KeyError, ValueError) as e:
                 wid = w.get("id", "unknown")
-                logger.error("Failed to format workout %s: %s", wid, e)
+                logger.error("Failed to format workout %s: %s", wid, e, exc_info=True)
                 formatted.append(f"[Workout {wid}: failed to format]")
     return "Workout library:\n\n" + "\n".join(formatted) if formatted else "No workouts in library."
 
@@ -91,7 +91,7 @@ async def list_folders(
                 formatted.append(format_folder_summary(Folder.from_dict(f)))
             except (TypeError, KeyError, ValueError) as e:
                 fid = f.get("id", "unknown")
-                logger.error("Failed to format folder %s: %s", fid, e)
+                logger.error("Failed to format folder %s: %s", fid, e, exc_info=True)
                 formatted.append(f"[Folder {fid}: failed to format]")
     return "Folders:\n\n" + "\n\n".join(formatted) if formatted else "No folders found."
 

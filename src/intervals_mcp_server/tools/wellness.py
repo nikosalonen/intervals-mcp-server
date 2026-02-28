@@ -71,7 +71,7 @@ async def get_wellness_data(
                     )
                     entries_processed += 1
                 except (TypeError, KeyError, ValueError) as e:
-                    logger.error("Failed to format wellness entry for %s: %s", date_str, e)
+                    logger.error("Failed to format wellness entry for %s: %s", date_str, e, exc_info=True)
                     wellness_summary += f"[Wellness data for {date_str}: failed to format]\n\n"
                     entries_processed += 1
     elif isinstance(result, list):
@@ -84,7 +84,7 @@ async def get_wellness_data(
                     entries_processed += 1
                 except (TypeError, KeyError, ValueError) as e:
                     entry_id = entry.get("id", "unknown")
-                    logger.error("Failed to format wellness entry %s: %s", entry_id, e)
+                    logger.error("Failed to format wellness entry %s: %s", entry_id, e, exc_info=True)
                     wellness_summary += f"[Wellness data for {entry_id}: failed to format]\n\n"
                     entries_processed += 1
 
