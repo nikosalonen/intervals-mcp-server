@@ -12,7 +12,7 @@ from intervals_mcp_server.utils.formatting import format_search_result
 from intervals_mcp_server.utils.schemas import Activity
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
-from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
+from intervals_mcp_server.mcp_instance import mcp
 
 logger = logging.getLogger(__name__)
 config = get_config()

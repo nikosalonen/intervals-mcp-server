@@ -8,30 +8,30 @@ from mcp.server.fastmcp import FastMCP  # pylint: disable=import-error
 
 # Import all tools for re-export
 # Note: Tools register themselves via @mcp.tool() decorators when imported
-from intervals_mcp_server.tools.activities import (  # noqa: F401
+from intervals_mcp_server.tools.activities import (
     get_activities,
     get_activity_details,
     get_activity_intervals,
     get_activity_streams,
 )
-from intervals_mcp_server.tools.events import (  # noqa: F401
+from intervals_mcp_server.tools.events import (
     add_or_update_event,
     delete_event,
     delete_events_by_date_range,
     get_event_by_id,
     get_events,
 )
-from intervals_mcp_server.tools.wellness import get_wellness_data  # noqa: F401
-from intervals_mcp_server.tools.custom_items import (  # noqa: F401
+from intervals_mcp_server.tools.wellness import get_wellness_data
+from intervals_mcp_server.tools.custom_items import (
     create_custom_item,
     delete_custom_item,
     get_custom_item_by_id,
     get_custom_items,
     update_custom_item,
 )
-from intervals_mcp_server.tools.athlete import get_athlete, get_sport_settings  # noqa: F401
-from intervals_mcp_server.tools.search import search_activities, search_intervals  # noqa: F401
-from intervals_mcp_server.tools.workouts import (  # noqa: F401
+from intervals_mcp_server.tools.athlete import get_athlete, get_sport_settings
+from intervals_mcp_server.tools.search import search_activities, search_intervals
+from intervals_mcp_server.tools.workouts import (
     create_bulk_workouts,
     list_folders,
     list_workouts,

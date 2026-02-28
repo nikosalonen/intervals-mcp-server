@@ -17,7 +17,7 @@ from intervals_mcp_server.utils.schemas import EventRequest, EventResponse
 from intervals_mcp_server.utils.types import WorkoutDoc
 from intervals_mcp_server.utils.validation import resolve_athlete_id, validate_date
 
-from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
+from intervals_mcp_server.mcp_instance import mcp
 
 logger = logging.getLogger(__name__)
 config = get_config()

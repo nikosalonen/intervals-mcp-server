@@ -14,7 +14,7 @@ from intervals_mcp_server.utils.formatting import format_activity_message, forma
 from intervals_mcp_server.utils.schemas import Activity, ActivityMessage, IntervalsData
 from intervals_mcp_server.utils.validation import resolve_athlete_id, resolve_date_params
 
-from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
+from intervals_mcp_server.mcp_instance import mcp
 
 logger = logging.getLogger(__name__)
 config = get_config()
