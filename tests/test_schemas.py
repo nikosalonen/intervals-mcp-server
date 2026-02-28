@@ -93,6 +93,18 @@ def test_activity_tags_default_empty():
     assert a.tags == []
 
 
+def test_activity_tags_scalar_string():
+    """Activity.from_dict() normalizes a scalar string tag to a single-element list."""
+    a = Activity.from_dict({"tags": "tag"})
+    assert a.tags == ["tag"]
+
+
+def test_activity_tags_mixed_list():
+    """Activity.from_dict() normalizes a mixed-type list, coercing to strings and filtering None."""
+    a = Activity.from_dict({"tags": ["a", 1, None]})
+    assert a.tags == ["a", "1"]
+
+
 # ── ActivityInterval / ActivityIntervalGroup / IntervalsData ──────────────
 
 

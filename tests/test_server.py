@@ -359,6 +359,87 @@ def test_create_bulk_events_passes_upsert_params(monkeypatch):
     assert captured_kwargs["params"]["updatePlanApplied"] is True
 
 
+def test_create_bulk_events_rejects_non_dict_items(monkeypatch):
+    """Test create_bulk_events rejects non-dict items and does not call the API."""
+    api_called = False
+
+    async def fake_request(*_args, **_kwargs):
+        nonlocal api_called
+        api_called = True
+        return []
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        create_bulk_events(
+            athlete_id="i1",
+            events=["not a dict", 42],  # type: ignore[list-item]
+        )
+    )
+    assert "Invalid event data" in result
+    assert "Event 0" in result
+    assert "expected a dict" in result
+    assert not api_called
+
+
+def test_create_bulk_events_rejects_missing_required_keys(monkeypatch):
+    """Test create_bulk_events rejects dicts missing required keys and does not call the API."""
+    api_called = False
+
+    async def fake_request(*_args, **_kwargs):
+        nonlocal api_called
+        api_called = True
+        return []
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        create_bulk_events(
+            athlete_id="i1",
+            events=[{"name": "Missing fields"}],
+        )
+    )
+    assert "Invalid event data" in result
+    assert "start_date_local" in result
+    assert "category" in result
+    assert not api_called
+
+
+def test_create_bulk_events_rejects_invalid_optional_types(monkeypatch):
+    """Test create_bulk_events rejects events with wrong optional field types."""
+    api_called = False
+
+    async def fake_request(*_args, **_kwargs):
+        nonlocal api_called
+        api_called = True
+        return []
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        create_bulk_events(
+            athlete_id="i1",
+            events=[{
+                "start_date_local": "2024-03-15T00:00:00",
+                "category": "WORKOUT",
+                "name": "Run",
+                "indoor": "yes",  # should be bool
+                "tags": "not-a-list",  # should be list of strings
+            }],
+        )
+    )
+    assert "Invalid event data" in result
+    assert "'indoor' must be" in result
+    assert "'tags' must be a list of strings" in result
+    assert not api_called
+
+
 def test_get_activity_messages(monkeypatch):
     """Test get_activity_messages returns formatted messages for an activity."""
     sample_messages = [

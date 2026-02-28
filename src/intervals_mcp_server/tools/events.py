@@ -386,6 +386,48 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
         return f"Error: {e}"
 
 
+_REQUIRED_EVENT_KEYS = ("start_date_local", "category", "name")
+
+_OPTIONAL_FIELD_TYPES: dict[str, type | tuple[type, ...]] = {
+    "uid": str,
+    "type": str,
+    "description": str,
+    "moving_time": (int, float),
+    "distance": (int, float),
+    "indoor": bool,
+    "color": str,
+    "tags": list,
+}
+
+
+def _validate_bulk_event(index: int, event: Any) -> list[str]:
+    """Validate a single event dict and return a list of error strings (empty if valid)."""
+    errors: list[str] = []
+    if not isinstance(event, dict):
+        errors.append(f"Event {index}: expected a dict, got {type(event).__name__}")
+        return errors
+
+    for key in _REQUIRED_EVENT_KEYS:
+        val = event.get(key)
+        if val is None:
+            errors.append(f"Event {index}: missing required key '{key}'")
+        elif not isinstance(val, str) or not val.strip():
+            errors.append(f"Event {index}: '{key}' must be a non-empty string")
+
+    for key, expected_type in _OPTIONAL_FIELD_TYPES.items():
+        if key not in event:
+            continue
+        val = event[key]
+        if key == "tags":
+            if not isinstance(val, list) or not all(isinstance(t, str) for t in val):
+                errors.append(f"Event {index}: 'tags' must be a list of strings")
+        elif not isinstance(val, expected_type):
+            type_name = expected_type.__name__ if isinstance(expected_type, type) else str(expected_type)
+            errors.append(f"Event {index}: '{key}' must be {type_name}, got {type(val).__name__}")
+
+    return errors
+
+
 @mcp.tool()
 async def create_bulk_events(
     events: list[dict[str, Any]],
@@ -444,6 +486,12 @@ async def create_bulk_events(
 
     if not events:
         return "No events provided. Pass a list of event objects to create."
+
+    validation_errors: list[str] = []
+    for i, event in enumerate(events):
+        validation_errors.extend(_validate_bulk_event(i, event))
+    if validation_errors:
+        return "Invalid event data:\n" + "\n".join(validation_errors)
 
     params: dict[str, Any] = {
         "upsertOnUid": upsert_on_uid,
