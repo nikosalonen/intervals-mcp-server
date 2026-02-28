@@ -143,7 +143,7 @@ def _parse_response(
     try:
         response_data = response.json() if response.content else {}
     except JSONDecodeError:
-        logger.error("Invalid JSON in response from: %s", full_url)
+        logger.error("Invalid JSON in response from: %s", full_url, exc_info=True)
         return {"error": True, "message": "Invalid JSON in response"}
     response.raise_for_status()
     return response_data
@@ -216,10 +216,10 @@ async def make_intervals_request(
     except httpx.HTTPStatusError as e:
         return _handle_http_status_error(e)
     except httpx.RequestError as e:
-        logger.error("Request error: %s", str(e))
+        logger.error("Request error: %s", str(e), exc_info=True)
         return {"error": True, "message": f"Request error: {str(e)}"}
     except httpx.HTTPError as e:
-        logger.error("HTTP client error: %s", str(e))
+        logger.error("HTTP client error: %s", str(e), exc_info=True)
         return {"error": True, "message": f"HTTP client error: {str(e)}"}
 
 
@@ -234,7 +234,7 @@ def _handle_http_status_error(e: httpx.HTTPStatusError) -> dict[str, Any]:
     """
     error_code = e.response.status_code
     error_text = e.response.text
-    logger.error("HTTP error: %s - %s", error_code, error_text)
+    logger.error("HTTP error: %s - %s", error_code, error_text, exc_info=True)
     return {
         "error": True,
         "status_code": error_code,
