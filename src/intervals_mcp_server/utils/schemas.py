@@ -45,12 +45,15 @@ def _safe_enum(enum_cls: type[StrEnum], value: Any) -> str | None:
         return None
     try:
         return enum_cls(value)
-    except ValueError:
+    except (ValueError, TypeError):
         return str(value)
 
 
 def _dict_items(items: list[Any], context: str = "") -> list[dict[str, Any]]:
     """Filter a list to only dict items, logging any skipped non-dict entries."""
+    if not isinstance(items, list):
+        logger.warning("Expected list but got %s in %s", type(items).__name__, context)
+        return []
     result: list[dict[str, Any]] = []
     for item in items:
         if isinstance(item, dict):
@@ -907,7 +910,7 @@ class EventResponse:
     priority: str | None = None
     result: str | None = None
     workout: EventWorkout | None = None
-    calendar: dict[str, Any] | None = None
+    calendar: Any = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "EventResponse":
