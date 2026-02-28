@@ -426,6 +426,8 @@ def _validate_bulk_event(index: int, event: Any) -> list[str]:
         if key == "tags":
             if not isinstance(val, list) or not all(isinstance(t, str) for t in val):
                 errors.append(f"Event {index}: 'tags' must be a list of strings")
+        elif key in ("moving_time", "distance") and isinstance(val, bool):
+            errors.append(f"Event {index}: '{key}' must be a number, got bool")
         elif not isinstance(val, expected_type):
             type_name = expected_type.__name__ if isinstance(expected_type, type) else str(expected_type)
             errors.append(f"Event {index}: '{key}' must be {type_name}, got {type(val).__name__}")

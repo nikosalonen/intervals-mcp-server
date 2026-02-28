@@ -430,6 +430,37 @@ def test_create_bulk_events_rejects_invalid_optional_types(monkeypatch):
     assert not api_called
 
 
+def test_create_bulk_events_rejects_boolean_for_numeric_fields(monkeypatch):
+    """Test create_bulk_events rejects booleans used for numeric optional fields."""
+    api_called = False
+
+    async def fake_request(*_args, **_kwargs):
+        nonlocal api_called
+        api_called = True
+        return []
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        create_bulk_events(
+            athlete_id="i1",
+            events=[{
+                "start_date_local": "2024-03-15T00:00:00",
+                "category": "WORKOUT",
+                "name": "Run",
+                "moving_time": True,
+                "distance": False,
+            }],
+        )
+    )
+    assert "Invalid event data" in result
+    assert "'moving_time' must be a number" in result
+    assert "'distance' must be a number" in result
+    assert not api_called
+
+
 def test_get_activity_messages(monkeypatch):
     """Test get_activity_messages returns formatted messages for an activity."""
     sample_messages = [
