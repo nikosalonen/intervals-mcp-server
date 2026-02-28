@@ -396,7 +396,6 @@ class Step:  # pylint: disable=too-many-instance-attributes
             if not nested and self.cooldown:
                 val += "\nCooldown\n"
 
-            val += ""
             if self.duration is not None:
                 val += f"- {self._format_duration()} "
             elif self.distance is not None:
