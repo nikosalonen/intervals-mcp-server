@@ -45,8 +45,12 @@ async def get_custom_items(
     if not result:
         return f"No custom items found for athlete {athlete_id_to_use}."
 
+    items = result if isinstance(result, list) else []
+    if not items:
+        return f"No custom items found for athlete {athlete_id_to_use}."
+
     output = "Custom Items:\n\n"
-    for item in result:
+    for item in items:
         if isinstance(item, dict):
             output += f"- ID: {item.get('id')}\n"
             output += f"  Name: {item.get('name', 'N/A')}\n"
