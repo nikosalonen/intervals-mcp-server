@@ -28,6 +28,7 @@ os.environ.setdefault("ATHLETE_ID", "i1")
 from intervals_mcp_server.server import (  # pylint: disable=wrong-import-position
     add_activity_message,
     add_or_update_event,
+    create_bulk_events,
     create_bulk_workouts,
     get_activities,
     get_activity_details,
@@ -280,6 +281,82 @@ def test_add_or_update_event(monkeypatch):
     assert "Successfully created event:" in result
     assert '"id": "e123"' in result
     assert '"name": "Test Workout"' in result
+
+
+def test_create_bulk_events(monkeypatch):
+    """Test create_bulk_events returns success with count."""
+    bulk_response = [
+        {"id": 1, "start_date_local": "2024-03-15T00:00:00", "category": "WORKOUT", "name": "Easy Run"},
+        {"id": 2, "start_date_local": "2024-03-16T00:00:00", "category": "NOTE", "name": "Rest Day"},
+    ]
+
+    async def fake_request(*_args, **_kwargs):
+        return bulk_response
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        create_bulk_events(
+            athlete_id="i1",
+            events=[
+                {"start_date_local": "2024-03-15T00:00:00", "category": "WORKOUT", "name": "Easy Run", "type": "Run"},
+                {"start_date_local": "2024-03-16T00:00:00", "category": "NOTE", "name": "Rest Day"},
+            ],
+        )
+    )
+    assert "Successfully created/updated 2 event(s)" in result
+
+
+def test_create_bulk_events_empty(monkeypatch):
+    """Test create_bulk_events with empty list returns message."""
+    result = asyncio.run(create_bulk_events(athlete_id="i1", events=[]))
+    assert "No events provided" in result
+
+
+def test_create_bulk_events_error(monkeypatch):
+    """Test create_bulk_events handles API errors."""
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "Invalid event data"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        create_bulk_events(
+            athlete_id="i1",
+            events=[{"start_date_local": "2024-03-15T00:00:00", "category": "WORKOUT", "name": "Bad"}],
+        )
+    )
+    assert "Error creating bulk events" in result
+    assert "Invalid event data" in result
+
+
+def test_create_bulk_events_passes_upsert_params(monkeypatch):
+    """Test create_bulk_events passes upsert query parameters correctly."""
+    captured_kwargs = {}
+
+    async def fake_request(*_args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return [{"id": 1, "name": "Updated"}]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        create_bulk_events(
+            athlete_id="i1",
+            events=[{"start_date_local": "2024-03-15T00:00:00", "category": "WORKOUT", "name": "Run", "uid": "w1"}],
+            upsert_on_uid=True,
+            update_plan_applied=True,
+        )
+    )
+    assert "Successfully created/updated 1 event(s)" in result
+    assert captured_kwargs["params"]["upsertOnUid"] is True
+    assert captured_kwargs["params"]["updatePlanApplied"] is True
 
 
 def test_get_activity_messages(monkeypatch):

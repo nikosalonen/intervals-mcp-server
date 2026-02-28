@@ -386,6 +386,85 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
         return f"Error: {e}"
 
 
+@mcp.tool()
+async def create_bulk_events(
+    events: list[dict[str, Any]],
+    athlete_id: str | None = None,
+    api_key: str | None = None,
+    upsert_on_uid: bool = False,
+    update_plan_applied: bool = False,
+) -> str:
+    """Create or update multiple events (planned workouts, notes, etc.) on the athlete's calendar in a single request.
+
+    This is much more efficient than calling add_or_update_event repeatedly. Supports upsert
+    via uid matching so you can update existing events in bulk.
+
+    Args:
+        events: List of event objects. Each event should have at minimum:
+            - start_date_local: Date string like "2024-03-15T00:00:00"
+            - category: Event category (WORKOUT, NOTE, RACE_A, RACE_B, RACE_C, SEASON_START, etc.)
+            - name: Event name
+            Optional fields:
+            - uid: Unique identifier for upsert matching
+            - type: Workout type (e.g. Ride, Run, Swim, Walk, Row)
+            - description: Workout description in Intervals.icu format (workout steps text)
+            - moving_time: Expected moving time in seconds
+            - distance: Expected distance in meters
+            - indoor: Whether workout is indoors
+            - color: Event color
+            - tags: List of tag strings
+        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided)
+        api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided)
+        upsert_on_uid: If true, update events with matching uid instead of creating new ones.
+            For events with category=TARGET, existing matching targets for the date and type are updated.
+        update_plan_applied: If true, stamp all created/updated events with current plan_applied date.
+
+    Example:
+        events = [
+            {
+                "start_date_local": "2024-03-15T00:00:00",
+                "category": "WORKOUT",
+                "name": "Easy Run",
+                "type": "Run",
+                "uid": "plan-w1-tue",
+                "moving_time": 2400,
+                "description": "Easy aerobic run\\n- 10m warmup\\n- 30m Z2\\n- 5m cooldown"
+            },
+            {
+                "start_date_local": "2024-03-16T00:00:00",
+                "category": "NOTE",
+                "name": "Rest Day",
+                "uid": "plan-w1-wed"
+            }
+        ]
+    """
+    athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
+    if error_msg:
+        return error_msg
+
+    if not events:
+        return "No events provided. Pass a list of event objects to create."
+
+    params: dict[str, Any] = {
+        "upsertOnUid": upsert_on_uid,
+        "updatePlanApplied": update_plan_applied,
+    }
+
+    result = await make_intervals_request(
+        url=f"/athlete/{athlete_id_to_use}/events/bulk",
+        api_key=api_key,
+        method="POST",
+        data=events,
+        params=params,
+    )
+
+    if isinstance(result, dict) and result.get("error"):
+        return f"Error creating bulk events: {result.get('message', 'Unknown error')}"
+
+    created = result if isinstance(result, list) else []
+    return f"Successfully created/updated {len(created)} event(s)."
+
+
 async def _create_or_update_event_request(
     athlete_id: str,
     api_key: str | None,
