@@ -509,8 +509,9 @@ async def create_bulk_events(
     if isinstance(result, dict) and "error" in result:
         return f"Error creating bulk events: {result.get('message', 'Unknown error')}"
 
-    created = result if isinstance(result, list) else []
-    return f"Successfully created/updated {len(created)} event(s)."
+    if not isinstance(result, list):
+        return f"Error creating bulk events: unexpected response: {result}"
+    return f"Successfully created/updated {len(result)} event(s)."
 
 
 async def _create_or_update_event_request(

@@ -128,5 +128,6 @@ async def create_bulk_workouts(
     if isinstance(result, dict) and result.get("error"):
         return f"Error creating bulk workouts: {result.get('message', 'Unknown error')}"
 
-    created = result if isinstance(result, list) else []
-    return f"Successfully created {len(created)} workout(s)."
+    if not isinstance(result, list):
+        return f"Error creating bulk workouts: unexpected response: {result}"
+    return f"Successfully created {len(result)} workout(s)."
