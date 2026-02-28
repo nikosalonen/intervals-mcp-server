@@ -85,7 +85,7 @@ def _handle_event_response(
 async def _delete_events_list(
     athlete_id: str, api_key: str | None, events: list[dict[str, Any]]
 ) -> list[str]:
-    """Delete a list of events and return IDs of failed deletions.
+    """Delete a list of events and return descriptions of failed deletions.
 
     Args:
         athlete_id: The athlete ID.
@@ -93,18 +93,23 @@ async def _delete_events_list(
         events: List of event dictionaries to delete.
 
     Returns:
-        List of event IDs that failed to delete.
+        List of failure descriptions for events that could not be deleted.
     """
     failed_events: list[str] = []
     for event in events:
-        event_id = str(event.get("id", ""))
+        event_id = event.get("id")
+        if not event_id:
+            failed_events.append("unknown (missing ID)")
+            continue
+        event_id = str(event_id)
         result = await make_intervals_request(
             url=f"/athlete/{athlete_id}/events/{event_id}",
             api_key=api_key,
             method="DELETE",
         )
         if isinstance(result, dict) and "error" in result:
-            failed_events.append(event_id)
+            reason = result.get("message", "unknown error")
+            failed_events.append(f"{event_id} ({reason})")
     return failed_events
 
 
