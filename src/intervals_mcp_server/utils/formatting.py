@@ -33,6 +33,8 @@ def _fmt(val: Any, default: str = "N/A") -> Any:
 
 def _fmt_datetime(value: str | None) -> str:
     """Parse and format an ISO datetime string to YYYY-MM-DD HH:MM:SS."""
+    if not isinstance(value, str):
+        return "Unknown"
     if not value:
         return "Unknown"
     if len(value) > 10:
