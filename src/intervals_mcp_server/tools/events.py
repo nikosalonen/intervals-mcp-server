@@ -160,19 +160,22 @@ async def get_events(
     if not events:
         return f"No events found for athlete {athlete_id_to_use} in the specified date range."
 
-    events_summary = "Events:\n\n"
+    formatted_entries: list[str] = []
     for event in events:
         if not isinstance(event, dict):
             continue
 
         try:
-            events_summary += format_event_summary(EventResponse.from_dict(event)) + "\n\n"
+            formatted_entries.append(format_event_summary(EventResponse.from_dict(event)))
         except (TypeError, KeyError, ValueError) as e:
             eid = event.get("id", "unknown")
             logger.error("Failed to format event %s: %s", eid, e, exc_info=True)
-            events_summary += f"[Event {eid}: failed to format]\n\n"
+            formatted_entries.append(f"[Event {eid}: failed to format]")
 
-    return events_summary
+    if not formatted_entries:
+        return f"No events found for athlete {athlete_id_to_use} in the specified date range."
+
+    return "Events:\n\n" + "\n\n".join(formatted_entries)
 
 
 @mcp.tool()

@@ -49,16 +49,18 @@ async def get_custom_items(
     if not items:
         return f"No custom items found for athlete {athlete_id_to_use}."
 
-    output = "Custom Items:\n\n"
+    rows: list[str] = []
     for item in items:
         if isinstance(item, dict):
-            output += f"- ID: {item.get('id')}\n"
-            output += f"  Name: {item.get('name', 'N/A')}\n"
-            output += f"  Type: {item.get('type', 'N/A')}\n"
+            row = f"- ID: {item.get('id')}\n"
+            row += f"  Name: {item.get('name', 'N/A')}\n"
+            row += f"  Type: {item.get('type', 'N/A')}\n"
             if item.get("description"):
-                output += f"  Description: {item['description']}\n"
-            output += "\n"
-    return output
+                row += f"  Description: {item['description']}\n"
+            rows.append(row)
+    if not rows:
+        return f"No custom items found for athlete {athlete_id_to_use}."
+    return "Custom Items:\n\n" + "\n".join(rows)
 
 
 @mcp.tool()
