@@ -97,11 +97,10 @@ async def _delete_events_list(
     """
     failed_events: list[str] = []
     for event in events:
-        event_id = event.get("id")
-        if not event_id:
+        if "id" not in event or event["id"] is None:
             failed_events.append("unknown (missing ID)")
             continue
-        event_id = str(event_id)
+        event_id = str(event["id"])
         result = await make_intervals_request(
             url=f"/athlete/{athlete_id}/events/{event_id}",
             api_key=api_key,
