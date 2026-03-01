@@ -119,6 +119,11 @@ from intervals_mcp_server.tools.workouts import (  # pylint: disable=wrong-impor
     list_folders,
     list_workouts,
 )
+from intervals_mcp_server.tools.seasons import (  # pylint: disable=wrong-import-position  # noqa: E402
+    create_season,
+    list_seasons,
+    update_season,
+)
 
 # Re-export make_intervals_request and httpx_client for backward compatibility
 # pylint: disable=duplicate-code  # This __all__ list is intentionally similar to tools/__init__.py

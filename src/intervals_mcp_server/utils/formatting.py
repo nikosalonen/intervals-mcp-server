@@ -335,6 +335,18 @@ def format_wellness_entry(entry: WellnessEntry) -> str:
     return "\n".join(lines)
 
 
+def format_season_summary(event: EventResponse) -> str:
+    """Format a season (SEASON_START event) into a readable string."""
+    tags_str = ", ".join(event.tags) if event.tags else "N/A"
+    return f"""Season: {_fmt(event.name, "Unnamed")}
+ID: {_fmt(event.id)}
+Start: {_fmt(event.start_date_local, "Unknown")}
+End: {_fmt(event.end_date_local, "Unknown")}
+Color: {_fmt(event.color)}
+Description: {_fmt(event.description, "No description")}
+Tags: {tags_str}"""
+
+
 def format_event_summary(event: EventResponse) -> str:
     """Format a basic event summary into a readable string."""
     event_type = "Workout" if event.workout else "Race" if event.race else "Other"

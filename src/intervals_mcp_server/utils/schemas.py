@@ -904,10 +904,13 @@ class EventResponse:
 
     id: int | None = None
     start_date_local: str | None = None
+    end_date_local: str | None = None
     name: str | None = None
     description: str | None = None
     type: str | None = None
     category: str | None = None
+    color: str | None = None
+    tags: list[str] = field(default_factory=list)
     race: bool | None = None
     priority: str | None = None
     result: str | None = None
@@ -923,10 +926,13 @@ class EventResponse:
             start_date_local=_first(
                 data.get("start_date_local"), data.get("date")
             ),
+            end_date_local=data.get("end_date_local"),
             name=data.get("name"),
             description=data.get("description"),
             type=_safe_enum(SportType, data.get("type")),
             category=_safe_enum(EventCategory, data.get("category")),
+            color=data.get("color"),
+            tags=_normalize_tags(data.get("tags")),
             race=data.get("race"),
             priority=data.get("priority"),
             result=data.get("result"),
