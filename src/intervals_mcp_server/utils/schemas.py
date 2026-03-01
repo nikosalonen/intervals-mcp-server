@@ -790,6 +790,7 @@ class Workout:
     moving_time: int | None = None
     icu_training_load: int | None = None
     target: str | None = None
+    day: int | None = None
     workout_doc: WorkoutDoc | None = None
 
     @classmethod
@@ -810,6 +811,7 @@ class Workout:
             moving_time=_first(data.get("moving_time"), data.get("duration")),
             icu_training_load=_first(data.get("icu_training_load"), data.get("tss")),
             target=data.get("target"),
+            day=data.get("day"),
             workout_doc=WorkoutDoc.from_dict(raw_doc) if isinstance(raw_doc, dict) else None,
         )
 
@@ -964,3 +966,42 @@ class EventRequest:
         if self.distance is not None:
             data["distance"] = self.distance
         return data
+
+
+@dataclass(frozen=True)
+class AthleteTrainingPlan:
+    """Athlete training plan from the Intervals.icu API."""
+
+    athlete_id: str | None = None
+    training_plan_id: int | None = None
+    training_plan_start_date: str | None = None
+    timezone: str | None = None
+    training_plan_last_applied: str | None = None
+    training_plan_alias: str | None = None
+    training_plan: Folder | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "AthleteTrainingPlan":
+        """Create an AthleteTrainingPlan from a raw API response dict."""
+        raw_plan = _first(data.get("training_plan"), data.get("trainingPlan"))
+        return cls(
+            athlete_id=_first(data.get("athlete_id"), data.get("athleteId")),
+            training_plan_id=_first(
+                data.get("training_plan_id"), data.get("trainingPlanId")
+            ),
+            training_plan_start_date=_first(
+                data.get("training_plan_start_date"),
+                data.get("trainingPlanStartDate"),
+            ),
+            timezone=data.get("timezone"),
+            training_plan_last_applied=_first(
+                data.get("training_plan_last_applied"),
+                data.get("trainingPlanLastApplied"),
+            ),
+            training_plan_alias=_first(
+                data.get("training_plan_alias"), data.get("trainingPlanAlias")
+            ),
+            training_plan=(
+                Folder.from_dict(raw_plan) if isinstance(raw_plan, dict) else None
+            ),
+        )

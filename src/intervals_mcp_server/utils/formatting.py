@@ -14,6 +14,7 @@ from intervals_mcp_server.utils.schemas import (
     ActivityMessage,
     Athlete,
     AthleteSportSettings,
+    AthleteTrainingPlan,
     CustomItem,
     EventResponse,
     EventWorkout,
@@ -438,6 +439,36 @@ def format_sport_settings(setting: AthleteSportSettings) -> str:
         lines.append(f"Power zones: {setting.power_zones}")
     if setting.hr_zones:
         lines.append(f"HR zones: {setting.hr_zones}")
+    return "\n".join(lines)
+
+
+def format_training_plan(plan: AthleteTrainingPlan) -> str:
+    """Format athlete training plan into a readable string."""
+    lines = [
+        "Training Plan:",
+        f"Athlete ID: {_fmt(plan.athlete_id)}",
+        f"Plan ID: {_fmt(plan.training_plan_id)}",
+        f"Start Date: {_fmt(plan.training_plan_start_date)}",
+        f"Timezone: {_fmt(plan.timezone)}",
+        f"Alias: {_fmt(plan.training_plan_alias)}",
+        f"Last Applied: {_fmt(plan.training_plan_last_applied)}",
+    ]
+
+    if plan.training_plan is not None:
+        folder = plan.training_plan
+        lines.append(f"Plan Name: {_fmt(folder.name)}")
+        lines.append(f"Workouts: {len(folder.workouts)}")
+        lines.append("")
+        for w in folder.workouts:
+            day_str = f"Day {w.day}" if w.day is not None else "Day N/A"
+            duration_str = f"{w.moving_time}s" if w.moving_time is not None else "N/A"
+            lines.append(
+                f"- {day_str}: {_fmt(w.name, 'Unnamed')} | "
+                f"{_fmt(w.type, 'Unknown')} | Duration: {duration_str}"
+            )
+    else:
+        lines.append("No training plan assigned.")
+
     return "\n".join(lines)
 
 

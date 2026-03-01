@@ -41,11 +41,15 @@ Usage:
         - delete_custom_item
         - get_athlete
         - get_sport_settings
+        - get_training_plan
         - search_activities
         - search_intervals
         - list_workouts
         - list_folders
         - create_bulk_workouts
+        - list_seasons
+        - create_season
+        - update_season
 
     See the README for more details on configuration and usage.
 """
@@ -104,6 +108,7 @@ from intervals_mcp_server.tools.custom_items import (  # pylint: disable=wrong-i
 from intervals_mcp_server.tools.athlete import (  # pylint: disable=wrong-import-position  # noqa: E402
     get_athlete,
     get_sport_settings,
+    get_training_plan,
 )
 from intervals_mcp_server.tools.search import (  # pylint: disable=wrong-import-position  # noqa: E402
     search_activities,
@@ -140,11 +145,15 @@ __all__ = [
     "delete_custom_item",
     "get_athlete",
     "get_sport_settings",
+    "get_training_plan",
     "search_activities",
     "search_intervals",
     "list_workouts",
     "list_folders",
     "create_bulk_workouts",
+    "list_seasons",
+    "create_season",
+    "update_season",
 ]
 
 
