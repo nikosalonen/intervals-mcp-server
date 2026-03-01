@@ -92,6 +92,76 @@ BULK_WORKOUT_RESPONSE = [
     {"id": "w11", "name": "New Workout 2"},
 ]
 
+TRAINING_PLAN_DATA = {
+    "athleteId": "i1",
+    "trainingPlanId": 42,
+    "trainingPlanStartDate": "2026-03-01",
+    "timezone": "Europe/Helsinki",
+    "trainingPlanLastApplied": "2026-02-28",
+    "trainingPlanAlias": "phase1",
+    "trainingPlan": {
+        "id": 100,
+        "name": "Base Building 8 Weeks",
+        "children": [
+            {
+                "id": 201,
+                "name": "Easy Spin",
+                "type": "Ride",
+                "day": 0,
+                "duration": 3600,
+            },
+            {
+                "id": 202,
+                "name": "Tempo Run",
+                "type": "Run",
+                "day": 1,
+                "duration": 2400,
+            },
+            {
+                "id": 203,
+                "name": "Long Ride",
+                "type": "Ride",
+                "day": 5,
+                "duration": 7200,
+            },
+        ],
+    },
+}
+
+SEASON_DATA = [
+    {
+        "id": 1001,
+        "start_date_local": "2026-01-01",
+        "end_date_local": "2026-03-31",
+        "name": "Base",
+        "description": "Aerobic base building phase",
+        "category": "SEASON_START",
+        "color": "#4CAF50",
+        "tags": ["base", "aerobic"],
+    },
+    {
+        "id": 1002,
+        "start_date_local": "2026-04-01",
+        "end_date_local": "2026-06-30",
+        "name": "Build",
+        "description": "Intensity build phase",
+        "category": "SEASON_START",
+        "color": "#FF9800",
+        "tags": ["build"],
+    },
+]
+
+SINGLE_SEASON_DATA = {
+    "id": 1001,
+    "start_date_local": "2026-01-01",
+    "end_date_local": "2026-03-31",
+    "name": "Base",
+    "description": "Aerobic base building phase",
+    "category": "SEASON_START",
+    "color": "#4CAF50",
+    "tags": ["base", "aerobic"],
+}
+
 INTERVALS_DATA = {
     "id": "i1",
     "analyzed": True,

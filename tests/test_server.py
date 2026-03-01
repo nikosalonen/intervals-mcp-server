@@ -20,6 +20,7 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     add_or_update_event,
     create_bulk_events,
     create_bulk_workouts,
+    create_season,
     get_activities,
     get_activity_details,
     get_activity_intervals,
@@ -27,6 +28,7 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     get_activity_streams,
     get_athlete,
     get_event_by_id,
+    get_training_plan,
     get_events,
     get_sport_settings,
     get_wellness_data,
@@ -36,9 +38,11 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     update_custom_item,
     delete_custom_item,
     list_folders,
+    list_seasons,
     list_workouts,
     search_activities,
     search_intervals,
+    update_season,
 )
 from tests.sample_data import (  # pylint: disable=wrong-import-position
     ATHLETE_DATA,
@@ -46,8 +50,11 @@ from tests.sample_data import (  # pylint: disable=wrong-import-position
     FOLDER_DATA,
     INTERVALS_DATA,
     SEARCH_RESULTS_DATA,
+    SEASON_DATA,
+    SINGLE_SEASON_DATA,
     SINGLE_SPORT_SETTING_DATA,
     SPORT_SETTINGS_DATA,
+    TRAINING_PLAN_DATA,
     WORKOUT_LIBRARY_DATA,
 )
 
@@ -813,6 +820,44 @@ def test_get_sport_settings_single(monkeypatch):
     assert "165" in result
 
 
+def test_get_training_plan(monkeypatch):
+    """Test get_training_plan returns formatted plan with workouts."""
+    async def fake_request(*_args, **_kwargs):
+        return TRAINING_PLAN_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.athlete.make_intervals_request", fake_request)
+    result = asyncio.run(get_training_plan(athlete_id="i1"))
+    assert "Base Building 8 Weeks" in result
+    assert "Easy Spin" in result
+    assert "Tempo Run" in result
+    assert "Long Ride" in result
+    assert "phase1" in result
+
+
+def test_get_training_plan_error(monkeypatch):
+    """Test get_training_plan handles API errors."""
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "Server error"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.athlete.make_intervals_request", fake_request)
+    result = asyncio.run(get_training_plan(athlete_id="i1"))
+    assert "Error fetching training plan" in result
+    assert "Server error" in result
+
+
+def test_get_training_plan_no_plan(monkeypatch):
+    """Test get_training_plan when no plan is assigned."""
+    async def fake_request(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.athlete.make_intervals_request", fake_request)
+    result = asyncio.run(get_training_plan(athlete_id="i1"))
+    assert "No training plan found" in result
+
+
 def test_search_activities(monkeypatch):
     """Test search_activities returns formatted search results."""
     async def fake_request(*_args, **_kwargs):
@@ -1311,3 +1356,105 @@ def test_get_wellness_dict_response_parse_failure_shows_placeholder(monkeypatch)
     result = asyncio.run(get_wellness_data(athlete_id="1"))
     assert "Weight: 70" in result
     assert "[Wellness data for 2024-01-02: failed to format]" in result
+
+
+# ── Season tools ─────────────────────────────────────────────────────────
+
+
+def test_list_seasons(monkeypatch):
+    """List seasons returns formatted season summaries."""
+
+    async def fake_request(*_args, **_kwargs):
+        return SEASON_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(list_seasons(athlete_id="i1"))
+    assert "Base" in result
+    assert "Build" in result
+    assert "#4CAF50" in result
+    assert "Seasons:" in result
+
+
+def test_list_seasons_empty(monkeypatch):
+    """List seasons returns empty message when no seasons found."""
+
+    async def fake_request(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(list_seasons(athlete_id="i1"))
+    assert "No seasons found" in result
+
+
+def test_list_seasons_error(monkeypatch):
+    """List seasons returns error message on API error."""
+
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "API failure"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(list_seasons(athlete_id="i1"))
+    assert "Error fetching seasons" in result
+    assert "API failure" in result
+
+
+def test_create_season(monkeypatch):
+    """Create season returns formatted season on success."""
+
+    async def fake_request(*_args, **_kwargs):
+        return SINGLE_SEASON_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(create_season(name="Base", start_date="2026-01-01", athlete_id="i1"))
+    assert "Season created successfully" in result
+    assert "Base" in result
+
+
+def test_create_season_error(monkeypatch):
+    """Create season returns error message on API error."""
+
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "Forbidden"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(create_season(name="Base", start_date="2026-01-01", athlete_id="i1"))
+    assert "Error creating season" in result
+    assert "Forbidden" in result
+
+
+def test_update_season(monkeypatch):
+    """Update season returns formatted season on success."""
+
+    async def fake_request(*_args, **_kwargs):
+        return SINGLE_SEASON_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_season(event_id="1001", name="Base Updated", athlete_id="i1"))
+    assert "Season updated successfully" in result
+    assert "Base" in result
+
+
+def test_update_season_error(monkeypatch):
+    """Update season returns error message on API error."""
+
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "Not found"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_season(event_id="9999", athlete_id="i1"))
+    assert "Error updating season" in result
+    assert "Not found" in result
