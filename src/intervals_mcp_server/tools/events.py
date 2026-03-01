@@ -48,18 +48,20 @@ def _prepare_event_data(  # pylint: disable=too-many-arguments,too-many-position
     workout_doc: WorkoutDoc | None,
     moving_time: int | None,
     distance: int | None,
+    description: str | None = None,
 ) -> dict[str, Any]:
     """Prepare event data dictionary for API request.
 
     Many arguments are required to match the Intervals.icu API event structure.
     """
     resolved_workout_type = _resolve_workout_type(name, workout_type)
+    resolved_description = description if description is not None else (str(workout_doc) if workout_doc else None)
     return EventRequest(
         start_date_local=start_date + "T00:00:00",
         category="WORKOUT",
         name=name,
         type=resolved_workout_type,
-        description=str(workout_doc) if workout_doc else None,
+        description=resolved_description,
         moving_time=moving_time,
         distance=distance,
     ).to_dict()
@@ -306,6 +308,7 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
     api_key: str | None = None,
     event_id: str | None = None,
     start_date: str | None = None,
+    description: str | None = None,
     workout_doc: WorkoutDoc | None = None,
     moving_time: int | None = None,
     distance: int | None = None,
@@ -321,6 +324,10 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
         event_id: The Intervals.icu event ID (optional). If provided, the existing event is updated; if omitted, a new event is created.
         start_date: Start date in YYYY-MM-DD format (optional, defaults to today)
         name: Name of the activity
+        description: Workout description text in Intervals.icu format (optional). Supports Intervals.icu
+            workout text syntax including custom zones (e.g. "- 10m CZZ2 HR"). If provided, takes
+            priority over workout_doc for the description field. Use this for text-based workout
+            descriptions with custom zone references that the structured workout_doc cannot express.
         workout_doc: steps as a list of Step objects (optional, but necessary to define workout steps)
         workout_type: Workout type (e.g. Ride, Run, Swim, Walk, Row)
         moving_time: Total expected moving time of the workout in seconds (optional)
@@ -384,7 +391,7 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
 
     try:
         event_data = _prepare_event_data(
-            name, workout_type, start_date, workout_doc, moving_time, distance
+            name, workout_type, start_date, workout_doc, moving_time, distance, description
         )
         return await _create_or_update_event_request(
             athlete_id_to_use, api_key, event_data, start_date, event_id
