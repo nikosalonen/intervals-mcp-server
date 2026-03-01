@@ -32,6 +32,7 @@ Usage:
         - delete_event
         - delete_events_by_date_range
         - add_or_update_event
+        - create_bulk_events
         - get_wellness_data
         - get_custom_items
         - get_custom_item_by_id
@@ -86,6 +87,7 @@ from intervals_mcp_server.tools.activities import (  # pylint: disable=wrong-imp
 )
 from intervals_mcp_server.tools.events import (  # pylint: disable=wrong-import-position  # noqa: E402
     add_or_update_event,
+    create_bulk_events,
     delete_event,
     delete_events_by_date_range,
     get_event_by_id,
@@ -129,6 +131,7 @@ __all__ = [
     "delete_event",
     "delete_events_by_date_range",
     "add_or_update_event",
+    "create_bulk_events",
     "get_wellness_data",
     "get_custom_items",
     "get_custom_item_by_id",

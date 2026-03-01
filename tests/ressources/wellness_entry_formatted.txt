@@ -17,5 +17,3 @@ Vital Signs:
 
 Activity:
 - Steps: 2303
-
-Status: Unlocked

@@ -5,6 +5,7 @@ This module contains tools for retrieving, creating, updating, and deleting athl
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -12,12 +13,13 @@ from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.dates import get_default_end_date, get_default_future_end_date
 from intervals_mcp_server.utils.formatting import format_event_details, format_event_summary
+from intervals_mcp_server.utils.schemas import EventRequest, EventResponse
 from intervals_mcp_server.utils.types import WorkoutDoc
 from intervals_mcp_server.utils.validation import resolve_athlete_id, validate_date
 
-# Import mcp instance from shared module for tool registration
-from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
+from intervals_mcp_server.mcp_instance import mcp
 
+logger = logging.getLogger(__name__)
 config = get_config()
 
 
@@ -52,15 +54,15 @@ def _prepare_event_data(  # pylint: disable=too-many-arguments,too-many-position
     Many arguments are required to match the Intervals.icu API event structure.
     """
     resolved_workout_type = _resolve_workout_type(name, workout_type)
-    return {
-        "start_date_local": start_date + "T00:00:00",
-        "category": "WORKOUT",
-        "name": name,
-        "description": str(workout_doc) if workout_doc else None,
-        "type": resolved_workout_type,
-        "moving_time": moving_time,
-        "distance": distance,
-    }
+    return EventRequest(
+        start_date_local=start_date + "T00:00:00",
+        category="WORKOUT",
+        name=name,
+        type=resolved_workout_type,
+        description=str(workout_doc) if workout_doc else None,
+        moving_time=moving_time,
+        distance=distance,
+    ).to_dict()
 
 
 def _handle_event_response(
@@ -83,7 +85,7 @@ def _handle_event_response(
 async def _delete_events_list(
     athlete_id: str, api_key: str | None, events: list[dict[str, Any]]
 ) -> list[str]:
-    """Delete a list of events and return IDs of failed deletions.
+    """Delete a list of events and return descriptions of failed deletions.
 
     Args:
         athlete_id: The athlete ID.
@@ -91,7 +93,7 @@ async def _delete_events_list(
         events: List of event dictionaries to delete.
 
     Returns:
-        List of event IDs that failed to delete.
+        List of failure descriptions for events that could not be deleted.
     """
     failed_events: list[str] = []
     for event in events:
@@ -105,7 +107,8 @@ async def _delete_events_list(
             method="DELETE",
         )
         if isinstance(result, dict) and "error" in result:
-            failed_events.append(event_id)
+            reason = result.get("message", "unknown error")
+            failed_events.append(f"{event_id} ({reason})")
     return failed_events
 
 
@@ -156,14 +159,22 @@ async def get_events(
     if not events:
         return f"No events found for athlete {athlete_id_to_use} in the specified date range."
 
-    events_summary = "Events:\n\n"
+    formatted_entries: list[str] = []
     for event in events:
         if not isinstance(event, dict):
             continue
 
-        events_summary += format_event_summary(event) + "\n\n"
+        try:
+            formatted_entries.append(format_event_summary(EventResponse.from_dict(event)))
+        except (TypeError, KeyError, ValueError) as e:
+            eid = event.get("id", "unknown")
+            logger.error("Failed to format event %s: %s", eid, e, exc_info=True)
+            formatted_entries.append(f"[Event {eid}: failed to format]")
 
-    return events_summary
+    if not formatted_entries:
+        return f"No events found for athlete {athlete_id_to_use} in the specified date range."
+
+    return "Events:\n\n" + "\n\n".join(formatted_entries)
 
 
 @mcp.tool()
@@ -200,7 +211,11 @@ async def get_event_by_id(
     if not isinstance(result, dict):
         return f"Invalid event format for event {event_id}."
 
-    return format_event_details(result)
+    try:
+        return format_event_details(EventResponse.from_dict(result))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.error("Failed to parse event %s: %s", event_id, e, exc_info=True)
+        return f"Error: Failed to parse event data for {event_id}."
 
 
 @mcp.tool()
@@ -210,10 +225,11 @@ async def delete_event(
     api_key: str | None = None,
 ) -> str:
     """Delete event for an athlete from Intervals.icu
+
     Args:
+        event_id: The Intervals.icu event ID
         athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
-        event_id: The Intervals.icu event ID
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
     if error_msg:
@@ -262,10 +278,10 @@ async def delete_events_by_date_range(
     """Delete events for an athlete from Intervals.icu in the specified date range.
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
-        api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
+        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
     if error_msg:
@@ -302,7 +318,7 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
     Args:
         athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
-        event_id: The Intervals.icu event ID (optional, will use event_id from .env if not provided)
+        event_id: The Intervals.icu event ID (optional). If provided, the existing event is updated; if omitted, a new event is created.
         start_date: Start date in YYYY-MM-DD format (optional, defaults to today)
         name: Name of the activity
         workout_doc: steps as a list of Step objects (optional, but necessary to define workout steps)
@@ -319,7 +335,7 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
                     {"power": {"value": "110", "units": "%ftp"}, "distance": "500", "text": "High-intensity"},
                     {"power": {"value": "80", "units": "%ftp"}, "duration": "90", "text": "Recovery"}
                 ]},
-                {"power": {"value": "80", "units": "%ftp"}, "duration": "600", "cooldown": true}
+                {"power": {"value": "80", "units": "%ftp"}, "duration": "600", "cooldown": true},
                 {"text": ""}, # Add comments or blank lines for readability
             ]
         }
@@ -375,6 +391,136 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
         )
     except ValueError as e:
         return f"Error: {e}"
+
+
+_REQUIRED_EVENT_KEYS = ("start_date_local", "category", "name")
+
+_OPTIONAL_FIELD_TYPES: dict[str, type | tuple[type, ...]] = {
+    "uid": str,
+    "type": str,
+    "description": str,
+    "moving_time": (int, float),
+    "distance": (int, float),
+    "indoor": bool,
+    "color": str,
+    "tags": list,
+}
+
+
+def _validate_bulk_event(index: int, event: Any) -> list[str]:
+    """Validate a single event dict and return a list of error strings (empty if valid)."""
+    errors: list[str] = []
+    if not isinstance(event, dict):
+        errors.append(f"Event {index}: expected a dict, got {type(event).__name__}")
+        return errors
+
+    for key in _REQUIRED_EVENT_KEYS:
+        val = event.get(key)
+        if val is None:
+            errors.append(f"Event {index}: missing required key '{key}'")
+        elif not isinstance(val, str) or not val.strip():
+            errors.append(f"Event {index}: '{key}' must be a non-empty string")
+
+    for key, expected_type in _OPTIONAL_FIELD_TYPES.items():
+        if key not in event:
+            continue
+        val = event[key]
+        if key == "tags":
+            if not isinstance(val, list) or not all(isinstance(t, str) for t in val):
+                errors.append(f"Event {index}: 'tags' must be a list of strings")
+        elif key in ("moving_time", "distance") and isinstance(val, bool):
+            errors.append(f"Event {index}: '{key}' must be a number, got bool")
+        elif not isinstance(val, expected_type):
+            type_name = expected_type.__name__ if isinstance(expected_type, type) else str(expected_type)
+            errors.append(f"Event {index}: '{key}' must be {type_name}, got {type(val).__name__}")
+
+    return errors
+
+
+@mcp.tool()
+async def create_bulk_events(
+    events: list[dict[str, Any]],
+    athlete_id: str | None = None,
+    api_key: str | None = None,
+    upsert_on_uid: bool = False,
+    update_plan_applied: bool = False,
+) -> str:
+    """Create or update multiple events (planned workouts, notes, etc.) on the athlete's calendar in a single request.
+
+    This is much more efficient than calling add_or_update_event repeatedly. Supports upsert
+    via uid matching so you can update existing events in bulk.
+
+    Args:
+        events: List of event objects. Each event should have at minimum:
+            - start_date_local: Date string like "2024-03-15T00:00:00"
+            - category: Event category (WORKOUT, NOTE, RACE_A, RACE_B, RACE_C, SEASON_START, etc.)
+            - name: Event name
+            Optional fields:
+            - uid: Unique identifier for upsert matching
+            - type: Workout type (e.g. Ride, Run, Swim, Walk, Row)
+            - description: Workout description in Intervals.icu format (workout steps text)
+            - moving_time: Expected moving time in seconds
+            - distance: Expected distance in meters
+            - indoor: Whether workout is indoors
+            - color: Event color
+            - tags: List of tag strings
+        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided)
+        api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided)
+        upsert_on_uid: If true, update events with matching uid instead of creating new ones.
+            For events with category=TARGET, existing matching targets for the date and type are updated.
+        update_plan_applied: If true, stamp all created/updated events with current plan_applied date.
+
+    Example:
+        events = [
+            {
+                "start_date_local": "2024-03-15T00:00:00",
+                "category": "WORKOUT",
+                "name": "Easy Run",
+                "type": "Run",
+                "uid": "plan-w1-tue",
+                "moving_time": 2400,
+                "description": "Easy aerobic run\\n- 10m warmup\\n- 30m Z2\\n- 5m cooldown"
+            },
+            {
+                "start_date_local": "2024-03-16T00:00:00",
+                "category": "NOTE",
+                "name": "Rest Day",
+                "uid": "plan-w1-wed"
+            }
+        ]
+    """
+    athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
+    if error_msg:
+        return error_msg
+
+    if not events:
+        return "No events provided. Pass a list of event objects to create."
+
+    validation_errors: list[str] = []
+    for i, event in enumerate(events):
+        validation_errors.extend(_validate_bulk_event(i, event))
+    if validation_errors:
+        return "Invalid event data:\n" + "\n".join(validation_errors)
+
+    params: dict[str, Any] = {
+        "upsertOnUid": upsert_on_uid,
+        "updatePlanApplied": update_plan_applied,
+    }
+
+    result = await make_intervals_request(
+        url=f"/athlete/{athlete_id_to_use}/events/bulk",
+        api_key=api_key,
+        method="POST",
+        data=events,
+        params=params,
+    )
+
+    if isinstance(result, dict) and "error" in result:
+        return f"Error creating bulk events: {result.get('message', 'Unknown error')}"
+
+    if not isinstance(result, list):
+        return f"Error creating bulk events: unexpected response: {result}"
+    return f"Successfully created/updated {len(result)} event(s)."
 
 
 async def _create_or_update_event_request(

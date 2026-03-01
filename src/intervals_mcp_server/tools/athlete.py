@@ -4,14 +4,17 @@ Athlete profile and sport settings MCP tools for Intervals.icu.
 This module contains tools for retrieving athlete profile and sport settings (FTP, zones, etc.).
 """
 
+import logging
+
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.formatting import format_athlete_summary, format_sport_settings
+from intervals_mcp_server.utils.schemas import Athlete, AthleteSportSettings
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
-# Import mcp instance from shared module for tool registration
-from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
+from intervals_mcp_server.mcp_instance import mcp
 
+logger = logging.getLogger(__name__)
 config = get_config()
 
 
@@ -41,7 +44,11 @@ async def get_athlete(
     if not isinstance(result, dict):
         return "Unexpected response from API."
 
-    return format_athlete_summary(result)
+    try:
+        return format_athlete_summary(Athlete.from_dict(result))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.error("Failed to parse athlete data: %s", e, exc_info=True)
+        return "Error: Failed to parse athlete data."
 
 
 @mcp.tool()
@@ -75,15 +82,25 @@ async def get_sport_settings(
     if sport_type:
         if not isinstance(result, dict):
             return "Unexpected response from API."
-        return format_sport_settings(result)
+        try:
+            return format_sport_settings(AthleteSportSettings.from_dict(result))
+        except (TypeError, KeyError, ValueError) as e:
+            logger.error("Failed to parse sport settings: %s", e, exc_info=True)
+            return "Error: Failed to parse sport settings."
 
     # All sports: result is a list or dict of sport settings
-    if isinstance(result, list):
-        return "\n\n---\n\n".join(
-            format_sport_settings(s) for s in result if isinstance(s, dict)
-        )
-    if isinstance(result, dict):
-        return "\n\n---\n\n".join(
-            format_sport_settings(s) for s in result.values() if isinstance(s, dict)
-        )
-    return "No sport settings found."
+    items = (
+        result
+        if isinstance(result, list)
+        else list(result.values()) if isinstance(result, dict) else []
+    )
+    formatted: list[str] = []
+    for s in items:
+        if isinstance(s, dict):
+            try:
+                formatted.append(format_sport_settings(AthleteSportSettings.from_dict(s)))
+            except (TypeError, KeyError, ValueError) as e:
+                sport_name = s.get("type", "Unknown")
+                logger.error("Failed to format sport setting for %s: %s", sport_name, e, exc_info=True)
+                formatted.append(f"[Sport setting '{sport_name}': failed to format]")
+    return "\n\n---\n\n".join(formatted) if formatted else "No sport settings found."

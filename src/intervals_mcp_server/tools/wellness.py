@@ -4,14 +4,17 @@ Wellness-related MCP tools for Intervals.icu.
 This module contains tools for retrieving athlete wellness data.
 """
 
+import logging
+
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.formatting import format_wellness_entry
+from intervals_mcp_server.utils.schemas import WellnessEntry
 from intervals_mcp_server.utils.validation import resolve_athlete_id, resolve_date_params
 
-# Import mcp instance from shared module for tool registration
-from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
+from intervals_mcp_server.mcp_instance import mcp
 
+logger = logging.getLogger(__name__)
 config = get_config()
 
 
@@ -54,17 +57,38 @@ async def get_wellness_data(
         )
 
     wellness_summary = "Wellness Data:\n\n"
+    entries_processed = 0
 
     # Handle both list and dictionary responses
     if isinstance(result, dict):
         for date_str, data in result.items():
-            # Add the date to the data dictionary if it's not already present
-            if isinstance(data, dict) and "date" not in data:
-                data["date"] = date_str
-            wellness_summary += format_wellness_entry(data) + "\n\n"
+            if isinstance(data, dict):
+                # Ensure the date key is set so WellnessEntry.id is populated
+                entry_data = data if "id" in data else {**data, "id": date_str}
+                try:
+                    wellness_summary += (
+                        format_wellness_entry(WellnessEntry.from_dict(entry_data)) + "\n\n"
+                    )
+                    entries_processed += 1
+                except (TypeError, KeyError, ValueError) as e:
+                    logger.error("Failed to format wellness entry for %s: %s", date_str, e, exc_info=True)
+                    wellness_summary += f"[Wellness data for {date_str}: failed to format]\n\n"
+                    entries_processed += 1
     elif isinstance(result, list):
         for entry in result:
             if isinstance(entry, dict):
-                wellness_summary += format_wellness_entry(entry) + "\n\n"
+                try:
+                    wellness_summary += (
+                        format_wellness_entry(WellnessEntry.from_dict(entry)) + "\n\n"
+                    )
+                    entries_processed += 1
+                except (TypeError, KeyError, ValueError) as e:
+                    entry_id = entry.get("id", "unknown")
+                    logger.error("Failed to format wellness entry %s: %s", entry_id, e, exc_info=True)
+                    wellness_summary += f"[Wellness data for {entry_id}: failed to format]\n\n"
+                    entries_processed += 1
+
+    if entries_processed == 0:
+        wellness_summary += "[No wellness data found]\n\n"
 
     return wellness_summary

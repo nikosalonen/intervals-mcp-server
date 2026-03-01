@@ -5,568 +5,538 @@ This module contains formatting functions for handling data from the Intervals.i
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Any
 
+from intervals_mcp_server.utils.schemas import (
+    Activity,
+    ActivityMessage,
+    Athlete,
+    AthleteSportSettings,
+    CustomItem,
+    EventResponse,
+    EventWorkout,
+    Folder,
+    IntervalsData,
+    WellnessEntry,
+    Workout,
+)
 
-def format_activity_summary(activity: dict[str, Any]) -> str:
-    """Format an activity into a readable string."""
-    start_time = activity.get("startTime", activity.get("start_date", "Unknown"))
+logger = logging.getLogger(__name__)
 
-    if isinstance(start_time, str) and len(start_time) > 10:
-        # Format datetime if it's a full ISO string
+
+def _fmt(val: Any, default: str = "N/A") -> Any:
+    """Return val if not None, otherwise return default."""
+    return default if val is None else val
+
+
+def _fmt_datetime(value: str | None) -> str:
+    """Parse and format an ISO datetime string to YYYY-MM-DD HH:MM:SS."""
+    if not isinstance(value, str):
+        return "Unknown"
+    if not value:
+        return "Unknown"
+    if len(value) > 10:
         try:
-            dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-            start_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
         except ValueError:
-            pass
+            logger.warning("Failed to parse datetime: %s", value)
+    return value
 
-    rpe = activity.get("perceived_exertion", None)
+
+def format_activity_summary(activity: Activity) -> str:
+    """Format an activity into a readable string."""
+    start_time = _fmt_datetime(activity.start_date)
+
+    rpe = activity.perceived_exertion
     if rpe is None:
-        rpe = activity.get("icu_rpe", "N/A")
-    if isinstance(rpe, (int, float)):
-        rpe = f"{rpe}/10"
+        rpe = activity.icu_rpe
+    rpe_str = f"{rpe}/10" if isinstance(rpe, (int, float)) else _fmt(rpe)
 
-    feel = activity.get("feel", "N/A")
-    if isinstance(feel, int):
-        feel = f"{feel}/5"
+    feel_str = f"{activity.feel}/5" if activity.feel is not None else "N/A"
 
     return f"""
-Activity: {activity.get("name", "Unnamed")}
-ID: {activity.get("id", "N/A")}
-Type: {activity.get("type", "Unknown")}
+Activity: {_fmt(activity.name, "Unnamed")}
+ID: {_fmt(activity.id)}
+Type: {_fmt(activity.type, "Unknown")}
 Date: {start_time}
-Description: {activity.get("description", "N/A")}
-Distance: {activity.get("distance", 0)} meters
-Duration: {activity.get("duration", activity.get("elapsed_time", 0))} seconds
-Moving Time: {activity.get("moving_time", "N/A")} seconds
-Elevation Gain: {activity.get("elevationGain", activity.get("total_elevation_gain", 0))} meters
-Elevation Loss: {activity.get("total_elevation_loss", "N/A")} meters
+Description: {_fmt(activity.description)}
+Distance: {activity.distance or 0} meters
+Duration: {activity.elapsed_time or 0} seconds
+Moving Time: {_fmt(activity.moving_time)} seconds
+Elevation Gain: {activity.total_elevation_gain or 0} meters
+Elevation Loss: {_fmt(activity.total_elevation_loss)} meters
 
 Power Data:
-Average Power: {activity.get("avgPower", activity.get("icu_average_watts", activity.get("average_watts", "N/A")))} watts
-Weighted Avg Power: {activity.get("icu_weighted_avg_watts", "N/A")} watts
-Training Load: {activity.get("trainingLoad", activity.get("icu_training_load", "N/A"))}
-FTP: {activity.get("icu_ftp", "N/A")} watts
-Kilojoules: {activity.get("icu_joules", "N/A")}
-Intensity: {activity.get("icu_intensity", "N/A")}
-Power:HR Ratio: {activity.get("icu_power_hr", "N/A")}
-Variability Index: {activity.get("icu_variability_index", "N/A")}
+Average Power: {_fmt(activity.icu_average_watts)} watts
+Weighted Avg Power: {_fmt(activity.icu_weighted_avg_watts)} watts
+Training Load: {_fmt(activity.icu_training_load)}
+FTP: {_fmt(activity.icu_ftp)} watts
+Kilojoules: {_fmt(activity.icu_joules)}
+Intensity: {_fmt(activity.icu_intensity)}
+Power:HR Ratio: {_fmt(activity.icu_power_hr)}
+Variability Index: {_fmt(activity.icu_variability_index)}
 
 Heart Rate Data:
-Average Heart Rate: {activity.get("avgHr", activity.get("average_heartrate", "N/A"))} bpm
-Max Heart Rate: {activity.get("max_heartrate", "N/A")} bpm
-LTHR: {activity.get("lthr", "N/A")} bpm
-Resting HR: {activity.get("icu_resting_hr", "N/A")} bpm
-Decoupling: {activity.get("decoupling", "N/A")}
+Average Heart Rate: {_fmt(activity.average_heartrate)} bpm
+Max Heart Rate: {_fmt(activity.max_heartrate)} bpm
+LTHR: {_fmt(activity.lthr)} bpm
+Resting HR: {_fmt(activity.icu_resting_hr)} bpm
+Decoupling: {_fmt(activity.decoupling)}
 
 Other Metrics:
-Cadence: {activity.get("average_cadence", "N/A")} rpm
-Calories: {activity.get("calories", "N/A")}
-Average Speed: {activity.get("average_speed", "N/A")} m/s
-Max Speed: {activity.get("max_speed", "N/A")} m/s
-Average Stride: {activity.get("average_stride", "N/A")}
-L/R Balance: {activity.get("avg_lr_balance", "N/A")}
-Weight: {activity.get("icu_weight", "N/A")} kg
-RPE: {rpe}
-Session RPE: {activity.get("session_rpe", "N/A")}
-Feel: {feel}
+Cadence: {_fmt(activity.average_cadence)} rpm
+Calories: {_fmt(activity.calories)}
+Average Speed: {_fmt(activity.average_speed)} m/s
+Max Speed: {_fmt(activity.max_speed)} m/s
+Average Stride: {_fmt(activity.average_stride)}
+L/R Balance: {_fmt(activity.avg_lr_balance)}
+Weight: {_fmt(activity.icu_weight)} kg
+RPE: {rpe_str}
+Session RPE: {_fmt(activity.session_rpe)}
+Feel: {feel_str}
 
 Environment:
-Trainer: {activity.get("trainer", "N/A")}
-Average Temp: {activity.get("average_temp", "N/A")}°C
-Min Temp: {activity.get("min_temp", "N/A")}°C
-Max Temp: {activity.get("max_temp", "N/A")}°C
-Avg Wind Speed: {activity.get("average_wind_speed", "N/A")} km/h
-Headwind %: {activity.get("headwind_percent", "N/A")}%
-Tailwind %: {activity.get("tailwind_percent", "N/A")}%
+Trainer: {_fmt(activity.trainer)}
+Average Temp: {_fmt(activity.average_temp)}°C
+Min Temp: {_fmt(activity.min_temp)}°C
+Max Temp: {_fmt(activity.max_temp)}°C
+Avg Wind Speed: {_fmt(activity.average_wind_speed)} km/h
+Headwind %: {_fmt(activity.headwind_percent)}%
+Tailwind %: {_fmt(activity.tailwind_percent)}%
 
 Training Metrics:
-Fitness (CTL): {activity.get("icu_ctl", "N/A")}
-Fatigue (ATL): {activity.get("icu_atl", "N/A")}
-TRIMP: {activity.get("trimp", "N/A")}
-Polarization Index: {activity.get("polarization_index", "N/A")}
-Power Load: {activity.get("power_load", "N/A")}
-HR Load: {activity.get("hr_load", "N/A")}
-Pace Load: {activity.get("pace_load", "N/A")}
-Efficiency Factor: {activity.get("icu_efficiency_factor", "N/A")}
+Fitness (CTL): {_fmt(activity.icu_ctl)}
+Fatigue (ATL): {_fmt(activity.icu_atl)}
+TRIMP: {_fmt(activity.trimp)}
+Polarization Index: {_fmt(activity.polarization_index)}
+Power Load: {_fmt(activity.power_load)}
+HR Load: {_fmt(activity.hr_load)}
+Pace Load: {_fmt(activity.pace_load)}
+Efficiency Factor: {_fmt(activity.icu_efficiency_factor)}
 
 Device Info:
-Device: {activity.get("device_name", "N/A")}
-Power Meter: {activity.get("power_meter", "N/A")}
-File Type: {activity.get("file_type", "N/A")}
+Device: {_fmt(activity.device_name)}
+Power Meter: {_fmt(activity.power_meter)}
+File Type: {_fmt(activity.file_type)}
 """
 
 
-def format_athlete_summary(athlete: dict[str, Any]) -> str:
-    """Format athlete profile into a readable string (name, ID, weight, resting HR, location, timezone, status)."""
-    return f"""Athlete: {athlete.get("name", "N/A")}
-ID: {athlete.get("id", "N/A")}
-Weight: {athlete.get("weight", "N/A")} kg
-Resting HR: {athlete.get("restingHr", athlete.get("resting_hr", "N/A"))} bpm
-Location: {athlete.get("location", "N/A")}
-Timezone: {athlete.get("timezone", "N/A")}
-Status: {athlete.get("status", "N/A")}"""
-
-
-def format_sport_settings(setting: dict[str, Any]) -> str:
-    """Format sport settings into a readable string (FTP, zones, LTHR, max HR, pace thresholds, warmup/cooldown)."""
-    lines = [
-        f"Sport: {setting.get('type', 'N/A')}",
-        f"FTP: {setting.get('ftp', 'N/A')}",
-        f"LTHR: {setting.get('lthr', 'N/A')}",
-        f"Max HR: {setting.get('maxHr', setting.get('max_hr', 'N/A'))}",
-        f"Pace thresholds: {setting.get('paceZones', setting.get('pace_zones', 'N/A'))}",
-        f"Warmup: {setting.get('warmup', 'N/A')} s",
-        f"Cooldown: {setting.get('cooldown', 'N/A')} s",
-    ]
-    zones = setting.get("zones", setting.get("powerZones", []))
-    if zones:
-        lines.append(f"Zones: {zones}")
-    return "\n".join(lines)
-
-
-def format_search_result(result: dict[str, Any]) -> str:
-    """Format a lightweight activity search result (ID, name, date, type, distance, tags)."""
-    start = result.get("startTime", result.get("start_date", "N/A"))
-    if isinstance(start, str) and len(start) > 10:
-        try:
-            dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
-            start = dt.strftime("%Y-%m-%d %H:%M")
-        except ValueError:
-            pass
-    tags = result.get("tags", [])
-    tags_str = ", ".join(tags) if isinstance(tags, list) else str(tags)
-    return f"ID: {result.get('id', 'N/A')} | {result.get('name', 'Unnamed')} | {start} | {result.get('type', 'N/A')} | {result.get('distance', 0)} m | Tags: {tags_str or 'none'}"
-
-
-def format_folder_summary(folder: dict[str, Any]) -> str:
-    """Format workout folder summary (name, ID, child workout count and names)."""
-    workouts = folder.get("workouts", folder.get("children", []))
-    count = len(workouts) if isinstance(workouts, list) else 0
-    names = []
-    if isinstance(workouts, list):
-        for w in workouts:
-            if isinstance(w, dict) and w.get("name"):
-                names.append(w["name"])
-            elif isinstance(w, str):
-                names.append(w)
-    lines = [
-        f"Folder: {folder.get('name', 'N/A')}",
-        f"ID: {folder.get('id', 'N/A')}",
-        f"Workouts: {count}",
-    ]
-    if names:
-        lines.extend(f"- {n}" for n in names)
-    return "\n".join(lines)
-
-
-def format_workout(workout: dict[str, Any]) -> str:
+def format_workout(workout: Workout) -> str:
     """Format a workout into a readable string."""
     return f"""
-Workout: {workout.get("name", "Unnamed")}
-ID: {workout.get("id", "N/A")}
-Description: {workout.get("description", "No description")}
-Sport: {workout.get("sport", workout.get("type", "Unknown"))}
-Type: {workout.get("type", "N/A")}
-Folder ID: {workout.get("folderId", workout.get("folder_id", "N/A"))}
-Tags: {workout.get("tags", "N/A")}
-Indoor: {workout.get("indoor", "N/A")}
-Distance: {workout.get("distance", "N/A")}
-Color: {workout.get("color", "N/A")}
-Duration: {workout.get("duration", 0)} seconds
-TSS: {workout.get("tss", "N/A")}
-Intervals: {len(workout.get("intervals", []))}
+Workout: {_fmt(workout.name, "Unnamed")}
+ID: {_fmt(workout.id)}
+Description: {_fmt(workout.description, "No description")}
+Sport: {_fmt(workout.type, "Unknown")}
+Folder ID: {_fmt(workout.folder_id)}
+Tags: {_fmt(", ".join(str(t) for t in workout.tags if t is not None) if workout.tags else None)}
+Indoor: {_fmt(workout.indoor)}
+Distance: {_fmt(workout.distance)}
+Color: {_fmt(workout.color)}
+Duration: {workout.moving_time or 0} seconds
+TSS: {_fmt(workout.icu_training_load)}
 """
 
 
-def _format_training_metrics(entries: dict[str, Any]) -> list[str]:
+def _format_training_metrics(entry: WellnessEntry) -> list[str]:
     """Format training metrics section."""
     training_metrics = []
-    for k, label in [
-        ("ctl", "Fitness (CTL)"),
-        ("atl", "Fatigue (ATL)"),
-        ("rampRate", "Ramp Rate"),
-        ("ctlLoad", "CTL Load"),
-        ("atlLoad", "ATL Load"),
+    for value, label in [
+        (entry.ctl, "Fitness (CTL)"),
+        (entry.atl, "Fatigue (ATL)"),
+        (entry.ramp_rate, "Ramp Rate"),
+        (entry.ctl_load, "CTL Load"),
+        (entry.atl_load, "ATL Load"),
     ]:
-        if entries.get(k) is not None:
-            training_metrics.append(f"- {label}: {entries[k]}")
+        if value is not None:
+            training_metrics.append(f"- {label}: {value}")
     return training_metrics
 
 
-def _format_sport_info(entries: dict[str, Any]) -> list[str]:
+def _format_sport_info(entry: WellnessEntry) -> list[str]:
     """Format sport-specific info section."""
     sport_info_list = []
-    if entries.get("sportInfo"):
-        for sport in entries.get("sportInfo", []):
-            if isinstance(sport, dict) and sport.get("eftp") is not None:
-                sport_info_list.append(f"- {sport.get('type')}: eFTP = {sport['eftp']}")
+    for sport in entry.sport_info:
+        if sport.eftp is not None:
+            sport_info_list.append(f"- {sport.type}: eFTP = {sport.eftp}")
     return sport_info_list
 
 
-def _format_vital_signs(entries: dict[str, Any]) -> list[str]:
+def _format_vital_signs(entry: WellnessEntry) -> list[str]:
     """Format vital signs section."""
     vital_signs = []
-    for k, label, unit in [
-        ("weight", "Weight", "kg"),
-        ("restingHR", "Resting HR", "bpm"),
-        ("hrv", "HRV", ""),
-        ("hrvSDNN", "HRV SDNN", ""),
-        ("avgSleepingHR", "Average Sleeping HR", "bpm"),
-        ("spO2", "SpO2", "%"),
-        ("systolic", "Systolic BP", ""),
-        ("diastolic", "Diastolic BP", ""),
-        ("respiration", "Respiration", "breaths/min"),
-        ("bloodGlucose", "Blood Glucose", "mmol/L"),
-        ("lactate", "Lactate", "mmol/L"),
-        ("vo2max", "VO2 Max", "ml/kg/min"),
-        ("bodyFat", "Body Fat", "%"),
-        ("abdomen", "Abdomen", "cm"),
-        ("baevskySI", "Baevsky Stress Index", ""),
+    for value, label, unit in [
+        (entry.weight, "Weight", "kg"),
+        (entry.resting_hr, "Resting HR", "bpm"),
+        (entry.hrv, "HRV", ""),
+        (entry.hrv_sdnn, "HRV SDNN", ""),
+        (entry.avg_sleeping_hr, "Average Sleeping HR", "bpm"),
+        (entry.spo2, "SpO2", "%"),
+        (entry.respiration, "Respiration", "breaths/min"),
+        (entry.blood_glucose, "Blood Glucose", "mmol/L"),
+        (entry.lactate, "Lactate", "mmol/L"),
+        (entry.vo2max, "VO2 Max", "ml/kg/min"),
+        (entry.body_fat, "Body Fat", "%"),
+        (entry.abdomen, "Abdomen", "cm"),
+        (entry.baevsky_si, "Baevsky Stress Index", ""),
     ]:
-        if entries.get(k) is not None:
-            value = entries[k]
-            if k == "systolic" and entries.get("diastolic") is not None:
-                vital_signs.append(
-                    f"- Blood Pressure: {entries['systolic']}/{entries['diastolic']} mmHg"
-                )
-            elif k not in ("systolic", "diastolic"):
-                vital_signs.append(f"- {label}: {value}{(' ' + unit) if unit else ''}")
+        if value is not None:
+            vital_signs.append(f"- {label}: {value}{(' ' + unit) if unit else ''}")
+
+    if entry.systolic is not None and entry.diastolic is not None:
+        vital_signs.append(f"- Blood Pressure: {entry.systolic}/{entry.diastolic} mmHg")
+    elif entry.systolic is not None:
+        vital_signs.append(f"- Systolic BP: {entry.systolic}")
+
     return vital_signs
 
 
-def _format_sleep_recovery(entries: dict[str, Any]) -> list[str]:
+def _format_sleep_recovery(entry: WellnessEntry) -> list[str]:
     """Format sleep and recovery section."""
     sleep_lines = []
     sleep_hours = None
-    if entries.get("sleepSecs") is not None:
-        sleep_hours = f"{entries['sleepSecs'] / 3600:.2f}"
-    elif entries.get("sleepHours") is not None:
-        sleep_hours = f"{entries['sleepHours']}"
+    if entry.sleep_secs is not None:
+        sleep_hours = f"{entry.sleep_secs / 3600:.2f}"
+    elif entry.sleep_hours is not None:
+        sleep_hours = f"{entry.sleep_hours}"
     if sleep_hours is not None:
         sleep_lines.append(f"  Sleep: {sleep_hours} hours")
 
-    if entries.get("sleepQuality") is not None:
-        quality_value = entries["sleepQuality"]
+    if entry.sleep_quality is not None:
         quality_labels = {1: "Great", 2: "Good", 3: "Average", 4: "Poor"}
-        quality_text = quality_labels.get(quality_value, str(quality_value))
-        sleep_lines.append(f"  Sleep Quality: {quality_value} ({quality_text})")
+        quality_text = quality_labels.get(entry.sleep_quality, str(entry.sleep_quality))
+        sleep_lines.append(f"  Sleep Quality: {entry.sleep_quality} ({quality_text})")
 
-    if entries.get("sleepScore") is not None:
-        sleep_lines.append(f"  Device Sleep Score: {entries['sleepScore']}/100")
+    if entry.sleep_score is not None:
+        sleep_lines.append(f"  Device Sleep Score: {entry.sleep_score}/100")
 
-    if entries.get("readiness") is not None:
-        sleep_lines.append(f"  Readiness: {entries['readiness']}/10")
+    if entry.readiness is not None:
+        sleep_lines.append(f"  Readiness: {entry.readiness}/10")
 
     return sleep_lines
 
 
-def _format_menstrual_tracking(entries: dict[str, Any]) -> list[str]:
+def _format_menstrual_tracking(entry: WellnessEntry) -> list[str]:
     """Format menstrual tracking section."""
     menstrual_lines = []
-    if entries.get("menstrualPhase") is not None:
-        menstrual_lines.append(f"  Menstrual Phase: {str(entries['menstrualPhase']).capitalize()}")
-    if entries.get("menstrualPhasePredicted") is not None:
+    if entry.menstrual_phase is not None:
+        menstrual_lines.append(f"  Menstrual Phase: {str(entry.menstrual_phase).capitalize()}")
+    if entry.menstrual_phase_predicted is not None:
         menstrual_lines.append(
-            f"  Predicted Phase: {str(entries['menstrualPhasePredicted']).capitalize()}"
+            f"  Predicted Phase: {str(entry.menstrual_phase_predicted).capitalize()}"
         )
     return menstrual_lines
 
 
-def _format_subjective_feelings(entries: dict[str, Any]) -> list[str]:
+def _format_subjective_feelings(entry: WellnessEntry) -> list[str]:
     """Format subjective feelings section."""
     subjective_lines = []
-    for k, label in [
-        ("soreness", "Soreness"),
-        ("fatigue", "Fatigue"),
-        ("stress", "Stress"),
-        ("mood", "Mood"),
-        ("motivation", "Motivation"),
-        ("injury", "Injury Level"),
+    for value, label in [
+        (entry.soreness, "Soreness"),
+        (entry.fatigue, "Fatigue"),
+        (entry.stress, "Stress"),
+        (entry.mood, "Mood"),
+        (entry.motivation, "Motivation"),
+        (entry.injury, "Injury Level"),
     ]:
-        if entries.get(k) is not None:
-            subjective_lines.append(f"  {label}: {entries[k]}/10")
+        if value is not None:
+            subjective_lines.append(f"  {label}: {value}/10")
     return subjective_lines
 
 
-def _format_nutrition_hydration(entries: dict[str, Any]) -> list[str]:
+def _format_nutrition_hydration(entry: WellnessEntry) -> list[str]:
     """Format nutrition and hydration section."""
     nutrition_lines = []
-    for k, label in [
-        ("kcalConsumed", "Calories Consumed"),
-        ("hydrationVolume", "Hydration Volume"),
+    for value, label in [
+        (entry.kcal_consumed, "Calories Consumed"),
+        (entry.hydration_volume, "Hydration Volume"),
     ]:
-        if entries.get(k) is not None:
-            nutrition_lines.append(f"- {label}: {entries[k]}")
+        if value is not None:
+            nutrition_lines.append(f"- {label}: {value}")
 
-    if entries.get("hydration") is not None:
-        nutrition_lines.append(f"  Hydration Score: {entries['hydration']}/10")
+    if entry.hydration is not None:
+        nutrition_lines.append(f"  Hydration Score: {entry.hydration}/10")
 
     return nutrition_lines
 
 
-def format_wellness_entry(entries: dict[str, Any]) -> str:
+def format_wellness_entry(entry: WellnessEntry) -> str:
     """Format wellness entry data into a readable string.
 
     Formats various wellness metrics including training metrics, vital signs,
-    sleep data, menstrual tracking, subjective feelings, nutrition, and activity.
+    sleep data, menstrual tracking, subjective feelings, nutrition, and daily steps.
 
     Args:
-        entries: Dictionary containing wellness data fields such as:
-            - Training metrics: ctl, atl, rampRate, ctlLoad, atlLoad
-            - Vital signs: weight, restingHR, hrv, hrvSDNN, avgSleepingHR, spO2,
-              systolic, diastolic, respiration, bloodGlucose, lactate, vo2max,
-              bodyFat, abdomen, baevskySI
-            - Sleep: sleepSecs, sleepHours, sleepQuality, sleepScore, readiness
-            - Menstrual: menstrualPhase, menstrualPhasePredicted
-            - Subjective: soreness, fatigue, stress, mood, motivation, injury
-            - Nutrition: kcalConsumed, hydrationVolume, hydration
-            - Activity: steps
-            - Other: comments, locked, date
+        entry: WellnessEntry containing wellness data for a single day.
 
     Returns:
         A formatted string representation of the wellness entry.
     """
     lines = ["Wellness Data:"]
-    lines.append(f"Date: {entries.get('id', 'N/A')}")
+    lines.append(f"Date: {_fmt(entry.id)}")
     lines.append("")
 
-    training_metrics = _format_training_metrics(entries)
+    training_metrics = _format_training_metrics(entry)
     if training_metrics:
         lines.append("Training Metrics:")
         lines.extend(training_metrics)
         lines.append("")
 
-    sport_info_list = _format_sport_info(entries)
+    sport_info_list = _format_sport_info(entry)
     if sport_info_list:
         lines.append("Sport-Specific Info:")
         lines.extend(sport_info_list)
         lines.append("")
 
-    vital_signs = _format_vital_signs(entries)
+    vital_signs = _format_vital_signs(entry)
     if vital_signs:
         lines.append("Vital Signs:")
         lines.extend(vital_signs)
         lines.append("")
 
-    sleep_lines = _format_sleep_recovery(entries)
+    sleep_lines = _format_sleep_recovery(entry)
     if sleep_lines:
         lines.append("Sleep & Recovery:")
         lines.extend(sleep_lines)
         lines.append("")
 
-    menstrual_lines = _format_menstrual_tracking(entries)
+    menstrual_lines = _format_menstrual_tracking(entry)
     if menstrual_lines:
         lines.append("Menstrual Tracking:")
         lines.extend(menstrual_lines)
         lines.append("")
 
-    subjective_lines = _format_subjective_feelings(entries)
+    subjective_lines = _format_subjective_feelings(entry)
     if subjective_lines:
         lines.append("Subjective Feelings:")
         lines.extend(subjective_lines)
         lines.append("")
 
-    nutrition_lines = _format_nutrition_hydration(entries)
+    nutrition_lines = _format_nutrition_hydration(entry)
     if nutrition_lines:
         lines.append("Nutrition & Hydration:")
         lines.extend(nutrition_lines)
         lines.append("")
 
-    if entries.get("steps") is not None:
+    if entry.steps is not None:
         lines.append("Activity:")
-        lines.append(f"- Steps: {entries['steps']}")
+        lines.append(f"- Steps: {entry.steps}")
         lines.append("")
 
-    if entries.get("comments"):
-        lines.append(f"Comments: {entries['comments']}")
-    if "locked" in entries:
-        lines.append(f"Status: {'Locked' if entries.get('locked') else 'Unlocked'}")
+    if entry.comments:
+        lines.append(f"Comments: {entry.comments}")
+    if entry.locked is not None:
+        lines.append(f"Status: {'Locked' if entry.locked else 'Unlocked'}")
 
     return "\n".join(lines)
 
 
-def format_event_summary(event: dict[str, Any]) -> str:
+def format_event_summary(event: EventResponse) -> str:
     """Format a basic event summary into a readable string."""
-
-    # Update to check for "date" if "start_date_local" is not provided
-    event_date = event.get("start_date_local", event.get("date", "Unknown"))
-    event_type = "Workout" if event.get("workout") else "Race" if event.get("race") else "Other"
-    event_name = event.get("name", "Unnamed")
-    event_id = event.get("id", "N/A")
-    event_desc = event.get("description", "No description")
-
-    return f"""Date: {event_date}
-ID: {event_id}
+    event_type = "Workout" if event.workout else "Race" if event.race else "Other"
+    return f"""Date: {_fmt(event.start_date_local, "Unknown")}
+ID: {_fmt(event.id)}
 Type: {event_type}
-Name: {event_name}
-Description: {event_desc}"""
+Name: {_fmt(event.name, "Unnamed")}
+Description: {_fmt(event.description, "No description")}"""
 
 
-def format_event_details(event: dict[str, Any]) -> str:
+def format_event_details(event: EventResponse) -> str:
     """Format detailed event information into a readable string."""
-
     event_details = f"""Event Details:
 
-ID: {event.get("id", "N/A")}
-Date: {event.get("date", "Unknown")}
-Name: {event.get("name", "Unnamed")}
-Description: {event.get("description", "No description")}"""
+ID: {_fmt(event.id)}
+Date: {_fmt(event.start_date_local, "Unknown")}
+Name: {_fmt(event.name, "Unnamed")}
+Description: {_fmt(event.description, "No description")}"""
 
-    # Check if it's a workout-based event
-    if "workout" in event and event["workout"]:
-        workout = event["workout"]
+    if event.workout is not None:
+        workout: EventWorkout = event.workout
         event_details += f"""
 
 Workout Information:
-Workout ID: {workout.get("id", "N/A")}
-Sport: {workout.get("sport", "Unknown")}
-Duration: {workout.get("duration", 0)} seconds
-TSS: {workout.get("tss", "N/A")}"""
+Workout ID: {_fmt(workout.id)}
+Sport: {_fmt(workout.type, "Unknown")}
+Duration: {workout.moving_time or 0} seconds
+TSS: {_fmt(workout.icu_training_load)}"""
 
-        # Include interval count if available
-        if "intervals" in workout and isinstance(workout["intervals"], list):
-            event_details += f"""
-Intervals: {len(workout["intervals"])}"""
+        if workout.intervals:
+            event_details += f"\nIntervals: {len(workout.intervals)}"
 
-    # Check if it's a race
-    if event.get("race"):
+    if event.race:
         event_details += f"""
 
 Race Information:
-Priority: {event.get("priority", "N/A")}
-Result: {event.get("result", "N/A")}"""
+Priority: {_fmt(event.priority)}
+Result: {_fmt(event.result)}"""
 
-    # Include calendar information
-    if "calendar" in event:
-        cal = event["calendar"]
-        event_details += f"""
-
-Calendar: {cal.get("name", "N/A")}"""
+    if event.calendar is not None:
+        if isinstance(event.calendar, dict):
+            event_details += f"\n\nCalendar: {_fmt(event.calendar.get('name'))}"
+        else:
+            event_details += f"\n\nCalendar: {_fmt(event.calendar)}"
 
     return event_details
 
 
-def format_activity_message(message: dict[str, Any]) -> str:
+def format_activity_message(message: ActivityMessage) -> str:
     """Format an activity message/note into a readable string."""
-    created = message.get("created", "Unknown")
-    if isinstance(created, str) and len(created) > 10:
-        try:
-            dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-            created = dt.strftime("%Y-%m-%d %H:%M:%S")
-        except ValueError:
-            pass
-
-    return f"""Author: {message.get("name", "Unknown")}
+    created = _fmt_datetime(message.created)
+    return f"""Author: {_fmt(message.name, "Unknown")}
 Date: {created}
-Type: {message.get("type", "TEXT")}
-Content: {message.get("content", "")}"""
+Type: {_fmt(message.type, "TEXT")}
+Content: {message.content or ""}"""
 
 
-def format_custom_item_details(item: dict[str, Any]) -> str:
+def format_custom_item_details(item: CustomItem) -> str:
     """Format detailed custom item information into a readable string."""
     lines = ["Custom Item Details:", ""]
-    lines.append(f"ID: {item.get('id', 'N/A')}")
-    lines.append(f"Name: {item.get('name', 'N/A')}")
-    lines.append(f"Type: {item.get('type', 'N/A')}")
+    lines.append(f"ID: {_fmt(item.id)}")
+    lines.append(f"Name: {_fmt(item.name)}")
+    lines.append(f"Type: {_fmt(item.type)}")
 
-    if item.get("description"):
-        lines.append(f"Description: {item['description']}")
-    if item.get("visibility"):
-        lines.append(f"Visibility: {item['visibility']}")
-    if item.get("index") is not None:
-        lines.append(f"Index: {item['index']}")
-    if item.get("hide_script") is not None:
-        lines.append(f"Hide Script: {item['hide_script']}")
-    if item.get("content"):
-        lines.append(f"Content: {json.dumps(item['content'], indent=2)}")
+    if item.description:
+        lines.append(f"Description: {item.description}")
+    if item.visibility:
+        lines.append(f"Visibility: {item.visibility}")
+    if item.index is not None:
+        lines.append(f"Index: {item.index}")
+    if item.hide_script is not None:
+        lines.append(f"Hide Script: {item.hide_script}")
+    if item.content:
+        lines.append(f"Content: {json.dumps(item.content, indent=2)}")
 
     return "\n".join(lines)
 
 
-def format_intervals(intervals_data: dict[str, Any]) -> str:
+def format_athlete_summary(athlete: Athlete) -> str:
+    """Format athlete profile into a readable string."""
+    return f"""Athlete: {_fmt(athlete.name)}
+ID: {_fmt(athlete.id)}
+Weight: {_fmt(athlete.weight)} kg
+Resting HR: {_fmt(athlete.icu_resting_hr)} bpm
+Location: {_fmt(athlete.location)}
+Timezone: {_fmt(athlete.timezone)}
+Status: {_fmt(athlete.status)}"""
+
+
+def format_sport_settings(setting: AthleteSportSettings) -> str:
+    """Format sport settings into a readable string."""
+    lines = [
+        f"Sport: {_fmt(setting.type)}",
+        f"FTP: {_fmt(setting.ftp)}",
+        f"LTHR: {_fmt(setting.lthr)}",
+        f"Max HR: {_fmt(setting.max_hr)}",
+        f"Pace zones: {setting.pace_zones or 'N/A'}",
+        f"Warmup: {_fmt(setting.warmup_time)} s",
+        f"Cooldown: {_fmt(setting.cooldown_time)} s",
+    ]
+    if setting.power_zones:
+        lines.append(f"Power zones: {setting.power_zones}")
+    if setting.hr_zones:
+        lines.append(f"HR zones: {setting.hr_zones}")
+    return "\n".join(lines)
+
+
+def format_search_result(result: Activity) -> str:
+    """Format a lightweight activity search result."""
+    start = _fmt_datetime(result.start_date) if result.start_date else "N/A"
+    tags_str = ", ".join(str(t) for t in result.tags if t is not None) if result.tags else "none"
+    return (
+        f"ID: {_fmt(result.id)} | {_fmt(result.name, 'Unnamed')} | "
+        f"{start} | {_fmt(result.type)} | {result.distance or 0} m | Tags: {tags_str}"
+    )
+
+
+def format_folder_summary(folder: Folder) -> str:
+    """Format workout folder summary."""
+    lines = [
+        f"Folder: {_fmt(folder.name)}",
+        f"ID: {_fmt(folder.id)}",
+        f"Workouts: {len(folder.workouts)}",
+    ]
+    for w in folder.workouts:
+        if w.name:
+            lines.append(f"- {w.name}")
+    return "\n".join(lines)
+
+
+def format_intervals(intervals_data: IntervalsData) -> str:
     """Format intervals data into a readable string with all available fields.
 
     Args:
-        intervals_data: The intervals data from the Intervals.icu API
+        intervals_data: Parsed IntervalsData from the Intervals.icu API.
 
     Returns:
-        A formatted string representation of the intervals data
+        A formatted string representation of the intervals data.
     """
-    # Format basic intervals information
-    result = f"""Intervals Analysis:
+    parts = [
+        f"Intervals Analysis:\n\nID: {_fmt(intervals_data.id)}\nAnalyzed: {_fmt(intervals_data.analyzed)}\n\n"
+    ]
 
-ID: {intervals_data.get("id", "N/A")}
-Analyzed: {intervals_data.get("analyzed", "N/A")}
+    if intervals_data.icu_intervals:
+        parts.append("Individual Intervals:\n\n")
 
-"""
+        for i, interval in enumerate(intervals_data.icu_intervals, 1):
+            label = interval.label or f"Interval {i}"
+            itype = interval.type or "Unknown"
+            parts.append(
+                f"[{i}] {label} ({itype})\n"
+                f"Duration: {interval.elapsed_time or 0} seconds (moving: {interval.moving_time or 0} seconds)\n"
+                f"Distance: {interval.distance or 0} meters\n"
+                f"Start-End Indices: {interval.start_index or 0}-{interval.end_index or 0}\n"
+                f"\nPower Metrics:\n"
+                f"  Average Power: {interval.average_watts or 0} watts ({interval.average_watts_kg or 0} W/kg)\n"
+                f"  Max Power: {interval.max_watts or 0} watts ({interval.max_watts_kg or 0} W/kg)\n"
+                f"  Weighted Avg Power: {interval.weighted_average_watts or 0} watts\n"
+                f"  Intensity: {interval.intensity or 0}\n"
+                f"  Training Load: {interval.training_load or 0}\n"
+                f"  Joules: {interval.joules or 0}\n"
+                f"  Joules > FTP: {interval.joules_above_ftp or 0}\n"
+                f"  Power Zone: {_fmt(interval.zone)} ({interval.zone_min_watts or 0}-{interval.zone_max_watts or 0} watts)\n"
+                f"  W' Balance: Start {interval.wbal_start or 0}, End {interval.wbal_end or 0}\n"
+                f"  L/R Balance: {interval.avg_lr_balance or 0}\n"
+                f"  Variability: {interval.w5s_variability or 0}\n"
+                f"  Torque: Avg {interval.average_torque or 0}, Min {interval.min_torque or 0}, Max {interval.max_torque or 0}\n"
+                f"\nHeart Rate & Metabolic:\n"
+                f"  Heart Rate: Avg {interval.average_heartrate or 0}, Min {interval.min_heartrate or 0}, Max {interval.max_heartrate or 0} bpm\n"
+                f"  Decoupling: {interval.decoupling or 0}\n"
+                f"  DFA α1: {interval.average_dfa_a1 or 0}\n"
+                f"  Respiration: {interval.average_respiration or 0} breaths/min\n"
+                f"  EPOC: {interval.average_epoc or 0}\n"
+                f"  SmO2: {interval.average_smo2 or 0}% / {interval.average_smo2_2 or 0}%\n"
+                f"  THb: {interval.average_thb or 0} / {interval.average_thb_2 or 0}\n"
+                f"\nSpeed & Cadence:\n"
+                f"  Speed: Avg {interval.average_speed or 0}, Min {interval.min_speed or 0}, Max {interval.max_speed or 0} m/s\n"
+                f"  GAP: {interval.gap or 0} m/s\n"
+                f"  Cadence: Avg {interval.average_cadence or 0}, Min {interval.min_cadence or 0}, Max {interval.max_cadence or 0} rpm\n"
+                f"  Stride: {interval.average_stride or 0}\n"
+                f"\nElevation & Environment:\n"
+                f"  Elevation Gain: {interval.total_elevation_gain or 0} meters\n"
+                f"  Altitude: Min {interval.min_altitude or 0}, Max {interval.max_altitude or 0} meters\n"
+                f"  Gradient: {interval.average_gradient or 0}%\n"
+                f"  Temperature: {interval.average_temp or 0}°C (Weather: {interval.average_weather_temp or 0}°C, Feels like: {interval.average_feels_like or 0}°C)\n"
+                f"  Wind: Speed {interval.average_wind_speed or 0} km/h, Gust {interval.average_wind_gust or 0} km/h, Direction {interval.prevailing_wind_deg or 0}°\n"
+                f"  Headwind: {interval.headwind_percent or 0}%, Tailwind: {interval.tailwind_percent or 0}%\n\n"
+            )
 
-    # Format individual intervals
-    if "icu_intervals" in intervals_data and intervals_data["icu_intervals"]:
-        result += "Individual Intervals:\n\n"
+    if intervals_data.icu_groups:
+        parts.append("Interval Groups:\n\n")
 
-        for i, interval in enumerate(intervals_data["icu_intervals"], 1):
-            result += f"""[{i}] {interval.get("label", f"Interval {i}")} ({interval.get("type", "Unknown")})
-Duration: {interval.get("elapsed_time", 0)} seconds (moving: {interval.get("moving_time", 0)} seconds)
-Distance: {interval.get("distance", 0)} meters
-Start-End Indices: {interval.get("start_index", 0)}-{interval.get("end_index", 0)}
+        for i, group in enumerate(intervals_data.icu_groups, 1):
+            parts.append(
+                f"Group: {_fmt(group.id, f'Group {i}')} (Contains {group.count or 0} intervals)\n"
+                f"Duration: {group.elapsed_time or 0} seconds (moving: {group.moving_time or 0} seconds)\n"
+                f"Distance: {group.distance or 0} meters\n"
+                f"Start-End Indices: {group.start_index or 0}-N/A\n\n"
+                f"Power: Avg {group.average_watts or 0} watts ({group.average_watts_kg or 0} W/kg), Max {group.max_watts or 0} watts\n"
+                f"W. Avg Power: {group.weighted_average_watts or 0} watts, Intensity: {group.intensity or 0}\n"
+                f"Heart Rate: Avg {group.average_heartrate or 0}, Max {group.max_heartrate or 0} bpm\n"
+                f"Speed: Avg {group.average_speed or 0}, Max {group.max_speed or 0} m/s\n"
+                f"Cadence: Avg {group.average_cadence or 0}, Max {group.max_cadence or 0} rpm\n\n"
+            )
 
-Power Metrics:
-  Average Power: {interval.get("average_watts", 0)} watts ({interval.get("average_watts_kg", 0)} W/kg)
-  Max Power: {interval.get("max_watts", 0)} watts ({interval.get("max_watts_kg", 0)} W/kg)
-  Weighted Avg Power: {interval.get("weighted_average_watts", 0)} watts
-  Intensity: {interval.get("intensity", 0)}
-  Training Load: {interval.get("training_load", 0)}
-  Joules: {interval.get("joules", 0)}
-  Joules > FTP: {interval.get("joules_above_ftp", 0)}
-  Power Zone: {interval.get("zone", "N/A")} ({interval.get("zone_min_watts", 0)}-{interval.get("zone_max_watts", 0)} watts)
-  W' Balance: Start {interval.get("wbal_start", 0)}, End {interval.get("wbal_end", 0)}
-  L/R Balance: {interval.get("avg_lr_balance", 0)}
-  Variability: {interval.get("w5s_variability", 0)}
-  Torque: Avg {interval.get("average_torque", 0)}, Min {interval.get("min_torque", 0)}, Max {interval.get("max_torque", 0)}
-
-Heart Rate & Metabolic:
-  Heart Rate: Avg {interval.get("average_heartrate", 0)}, Min {interval.get("min_heartrate", 0)}, Max {interval.get("max_heartrate", 0)} bpm
-  Decoupling: {interval.get("decoupling", 0)}
-  DFA α1: {interval.get("average_dfa_a1", 0)}
-  Respiration: {interval.get("average_respiration", 0)} breaths/min
-  EPOC: {interval.get("average_epoc", 0)}
-  SmO2: {interval.get("average_smo2", 0)}% / {interval.get("average_smo2_2", 0)}%
-  THb: {interval.get("average_thb", 0)} / {interval.get("average_thb_2", 0)}
-
-Speed & Cadence:
-  Speed: Avg {interval.get("average_speed", 0)}, Min {interval.get("min_speed", 0)}, Max {interval.get("max_speed", 0)} m/s
-  GAP: {interval.get("gap", 0)} m/s
-  Cadence: Avg {interval.get("average_cadence", 0)}, Min {interval.get("min_cadence", 0)}, Max {interval.get("max_cadence", 0)} rpm
-  Stride: {interval.get("average_stride", 0)}
-
-Elevation & Environment:
-  Elevation Gain: {interval.get("total_elevation_gain", 0)} meters
-  Altitude: Min {interval.get("min_altitude", 0)}, Max {interval.get("max_altitude", 0)} meters
-  Gradient: {interval.get("average_gradient", 0)}%
-  Temperature: {interval.get("average_temp", 0)}°C (Weather: {interval.get("average_weather_temp", 0)}°C, Feels like: {interval.get("average_feels_like", 0)}°C)
-  Wind: Speed {interval.get("average_wind_speed", 0)} km/h, Gust {interval.get("average_wind_gust", 0)} km/h, Direction {interval.get("prevailing_wind_deg", 0)}°
-  Headwind: {interval.get("headwind_percent", 0)}%, Tailwind: {interval.get("tailwind_percent", 0)}%
-
-"""
-
-    # Format interval groups
-    if "icu_groups" in intervals_data and intervals_data["icu_groups"]:
-        result += "Interval Groups:\n\n"
-
-        for i, group in enumerate(intervals_data["icu_groups"], 1):
-            result += f"""Group: {group.get("id", f"Group {i}")} (Contains {group.get("count", 0)} intervals)
-Duration: {group.get("elapsed_time", 0)} seconds (moving: {group.get("moving_time", 0)} seconds)
-Distance: {group.get("distance", 0)} meters
-Start-End Indices: {group.get("start_index", 0)}-N/A
-
-Power: Avg {group.get("average_watts", 0)} watts ({group.get("average_watts_kg", 0)} W/kg), Max {group.get("max_watts", 0)} watts
-W. Avg Power: {group.get("weighted_average_watts", 0)} watts, Intensity: {group.get("intensity", 0)}
-Heart Rate: Avg {group.get("average_heartrate", 0)}, Max {group.get("max_heartrate", 0)} bpm
-Speed: Avg {group.get("average_speed", 0)}, Max {group.get("max_speed", 0)} m/s
-Cadence: Avg {group.get("average_cadence", 0)}, Max {group.get("max_cadence", 0)} rpm
-
-"""
-
-    return result
+    return "".join(parts)

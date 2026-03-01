@@ -7,7 +7,7 @@ Also includes enums for server configuration.
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Any, Union
+from typing import Any
 from enum import Enum, StrEnum
 import json
 
@@ -74,6 +74,9 @@ class PaceUnits(Enum):
     MINS_KM = "MINS_KM"
     MINS_MILE = "MINS_MILE"
     SECS_500M = "SECS_500M"
+    SECS_400M = "SECS_400M"
+    SECS_250M = "SECS_250M"
+    NONE = "NONE"
 
 
 class ValueUnits(Enum):
@@ -113,15 +116,15 @@ class Value:
     including percentages, zones, and absolute values.
     """
 
-    value: Optional[float] = None
-    start: Optional[float] = None
-    end: Optional[float] = None
-    units: Optional[ValueUnits] = None
-    target: Optional[HrTarget] = None
+    value: float | None = None
+    start: float | None = None
+    end: float | None = None
+    units: ValueUnits | None = None
+    target: HrTarget | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert Value instance to dictionary for JSON serialization."""
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         if self.value is not None:
             data["value"] = self.value
         if self.start is not None:
@@ -135,7 +138,7 @@ class Value:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Value":
+    def from_dict(cls, data: dict[str, Any]) -> "Value":
         """Create Value instance from dictionary."""
         kwargs = {}
         if "value" in data:
@@ -215,36 +218,36 @@ class Step:  # pylint: disable=too-many-instance-attributes
     contain nested steps for repeats.
     """
 
-    text: Optional[str] = None
-    text_locale: Optional[Dict[str, str]] = None
-    duration: Optional[int] = None
-    distance: Optional[float] = None
-    until_lap_press: Optional[bool] = None
-    reps: Optional[int] = None
-    warmup: Optional[bool] = None
-    cooldown: Optional[bool] = None
-    intensity: Optional[Intensity] = None
-    steps: Optional[List["Step"]] = None
-    ramp: Optional[bool] = None
-    freeride: Optional[bool] = None
-    maxeffort: Optional[bool] = None
-    power: Optional[Value] = None
-    hr: Optional[Value] = None
-    pace: Optional[Value] = None
-    cadence: Optional[Value] = None
-    hidepower: Optional[bool] = None
+    text: str | None = None
+    text_locale: dict[str, str] | None = None
+    duration: int | None = None
+    distance: float | None = None
+    until_lap_press: bool | None = None
+    reps: int | None = None
+    warmup: bool | None = None
+    cooldown: bool | None = None
+    intensity: Intensity | None = None
+    steps: list["Step"] | None = None
+    ramp: bool | None = None
+    freeride: bool | None = None
+    maxeffort: bool | None = None
+    power: Value | None = None
+    hr: Value | None = None
+    pace: Value | None = None
+    cadence: Value | None = None
+    hidepower: bool | None = None
     # these are filled in with actual watts, bpm etc. when resolve=true parameter is supplied to the endpoint
-    _power: Optional[Value] = None
-    _hr: Optional[Value] = None
-    _pace: Optional[Value] = None
-    _distance: Optional[float] = None
+    _power: Value | None = None
+    _hr: Value | None = None
+    _pace: Value | None = None
+    _distance: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:  # pylint: disable=too-many-branches
+    def to_dict(self) -> dict[str, Any]:  # pylint: disable=too-many-branches
         """Convert Step instance to dictionary for JSON serialization.
 
         Many branches are required to handle all optional fields of the Step dataclass.
         """
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         if self.text is not None:
             data["text"] = self.text
         if self.text_locale is not None:
@@ -292,7 +295,7 @@ class Step:  # pylint: disable=too-many-instance-attributes
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Step":  # pylint: disable=too-many-branches
+    def from_dict(cls, data: dict[str, Any]) -> "Step":  # pylint: disable=too-many-branches
         """Create Step instance from dictionary.
 
         Many branches are required to handle all optional fields of the Step dataclass.
@@ -393,7 +396,6 @@ class Step:  # pylint: disable=too-many-instance-attributes
             if not nested and self.cooldown:
                 val += "\nCooldown\n"
 
-            val += ""
             if self.duration is not None:
                 val += f"- {self._format_duration()} "
             elif self.distance is not None:
@@ -440,12 +442,12 @@ class SportSettings:
     as needed by the Intervals.icu API.
     """
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert SportSettings instance to dictionary for JSON serialization."""
         return {}
 
     @classmethod
-    def from_dict(cls, _data: Dict[str, Any]) -> "SportSettings":
+    def from_dict(cls, _data: dict[str, Any]) -> "SportSettings":
         """Create SportSettings instance from dictionary."""
         return cls()
 
@@ -469,30 +471,28 @@ class WorkoutDoc:  # pylint: disable=too-many-instance-attributes
     Many instance attributes are required to match the Intervals.icu API schema exactly.
     """
 
-    description: Optional[str] = None
-    description_locale: Optional[Dict[str, str]] = None
-    duration: Optional[int] = None
-    distance: Optional[float] = None
-    ftp: Optional[int] = None
-    lthr: Optional[int] = None
-    threshold_pace: Optional[float] = None  # meters/sec
-    pace_units: Optional[PaceUnits] = None
-    sport_settings: Optional[SportSettings] = None
-    category: Optional[str] = None
-    target: Optional[WorkoutTarget] = None
-    steps: Optional[List[Step]] = None
-    zone_times: Optional[List[Union[int, Any]]] = (
-        None  # sometimes array of ints otherwise array of objects
-    )
-    options: Optional[Dict[str, str]] = None
-    locales: Optional[List[str]] = None
+    description: str | None = None
+    description_locale: dict[str, str] | None = None
+    duration: int | None = None
+    distance: float | None = None
+    ftp: int | None = None
+    lthr: int | None = None
+    threshold_pace: float | None = None  # meters/sec
+    pace_units: PaceUnits | None = None
+    sport_settings: SportSettings | None = None
+    category: str | None = None
+    target: WorkoutTarget | None = None
+    steps: list[Step] | None = None
+    zone_times: list[Any] | None = None  # sometimes array of ints, otherwise array of objects
+    options: dict[str, str] | None = None
+    locales: list[str] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:  # pylint: disable=too-many-branches
+    def to_dict(self) -> dict[str, Any]:  # pylint: disable=too-many-branches
         """Convert WorkoutDoc instance to dictionary for JSON serialization.
 
         Many branches are required to handle all optional fields of the WorkoutDoc dataclass.
         """
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         if self.description is not None:
             data["description"] = self.description
         if self.description_locale is not None:
@@ -526,7 +526,7 @@ class WorkoutDoc:  # pylint: disable=too-many-instance-attributes
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WorkoutDoc":  # pylint: disable=too-many-branches
+    def from_dict(cls, data: dict[str, Any]) -> "WorkoutDoc":  # pylint: disable=too-many-branches
         """Create WorkoutDoc instance from dictionary.
 
         Many branches are required to handle all optional fields of the WorkoutDoc dataclass.

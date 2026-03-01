@@ -5,16 +5,18 @@ This module contains tools for managing athlete custom items (charts, fields, zo
 """
 
 import json
+import logging
 from typing import Any
 
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.formatting import format_custom_item_details
+from intervals_mcp_server.utils.schemas import CustomItem
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
-# Import mcp instance from shared module for tool registration
-from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
+from intervals_mcp_server.mcp_instance import mcp
 
+logger = logging.getLogger(__name__)
 config = get_config()
 
 
@@ -43,16 +45,22 @@ async def get_custom_items(
     if not result:
         return f"No custom items found for athlete {athlete_id_to_use}."
 
-    output = "Custom Items:\n\n"
-    for item in result:
+    items = result if isinstance(result, list) else []
+    if not items:
+        return f"No custom items found for athlete {athlete_id_to_use}."
+
+    rows: list[str] = []
+    for item in items:
         if isinstance(item, dict):
-            output += f"- ID: {item.get('id')}\n"
-            output += f"  Name: {item.get('name', 'N/A')}\n"
-            output += f"  Type: {item.get('type', 'N/A')}\n"
+            row = f"- ID: {item.get('id')}\n"
+            row += f"  Name: {item.get('name', 'N/A')}\n"
+            row += f"  Type: {item.get('type', 'N/A')}\n"
             if item.get("description"):
-                output += f"  Description: {item['description']}\n"
-            output += "\n"
-    return output
+                row += f"  Description: {item['description']}\n"
+            rows.append(row)
+    if not rows:
+        return f"No custom items found for athlete {athlete_id_to_use}."
+    return "Custom Items:\n\n" + "\n".join(rows)
 
 
 @mcp.tool()
@@ -82,7 +90,11 @@ async def get_custom_item_by_id(
     if not result or not isinstance(result, dict):
         return f"No custom item found with ID {item_id}."
 
-    return format_custom_item_details(result)
+    try:
+        return format_custom_item_details(CustomItem.from_dict(result))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.error("Failed to parse custom item %s: %s", item_id, e, exc_info=True)
+        return f"Error: Failed to parse custom item data for {item_id}."
 
 
 @mcp.tool()
@@ -138,7 +150,12 @@ async def create_custom_item(
     if not result or not isinstance(result, dict):
         return "Error: Unexpected response when creating custom item."
 
-    return f"Successfully created custom item:\n\n{format_custom_item_details(result)}"
+    try:
+        details = format_custom_item_details(CustomItem.from_dict(result))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.error("Failed to format created custom item: %s", e, exc_info=True)
+        return f"Custom item created (ID: {result.get('id', 'unknown')}), but failed to format response."
+    return f"Successfully created custom item:\n\n{details}"
 
 
 @mcp.tool()
@@ -200,7 +217,12 @@ async def update_custom_item(
     if not result or not isinstance(result, dict):
         return "Error: Unexpected response when updating custom item."
 
-    return f"Successfully updated custom item:\n\n{format_custom_item_details(result)}"
+    try:
+        details = format_custom_item_details(CustomItem.from_dict(result))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.error("Failed to format updated custom item: %s", e, exc_info=True)
+        return f"Custom item updated (ID: {result.get('id', 'unknown')}), but failed to format response."
+    return f"Successfully updated custom item:\n\n{details}"
 
 
 @mcp.tool()

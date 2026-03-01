@@ -4,17 +4,19 @@ Activity-related MCP tools for Intervals.icu.
 This module contains tools for retrieving and managing athlete activities.
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.formatting import format_activity_message, format_activity_summary, format_intervals
+from intervals_mcp_server.utils.schemas import Activity, ActivityMessage, IntervalsData
 from intervals_mcp_server.utils.validation import resolve_athlete_id, resolve_date_params
 
-# Import mcp instance from shared module for tool registration
-from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
+from intervals_mcp_server.mcp_instance import mcp
 
+logger = logging.getLogger(__name__)
 config = get_config()
 
 
@@ -89,11 +91,15 @@ def _format_activities_response(
             )
         return f"No named activities found for athlete {athlete_id} in the specified date range. Try with include_unnamed=True to see all activities."
 
-    # Format the output
     activities_summary = "Activities:\n\n"
     for activity in activities:
         if isinstance(activity, dict):
-            activities_summary += format_activity_summary(activity) + "\n"
+            try:
+                activities_summary += format_activity_summary(Activity.from_dict(activity)) + "\n"
+            except (TypeError, KeyError, ValueError) as e:
+                aid = activity.get("id", "unknown")
+                logger.error("Failed to format activity %s: %s", aid, e, exc_info=True)
+                activities_summary += f"[Activity {aid}: failed to format]\n"
         else:
             activities_summary += f"Invalid activity format: {activity}\n\n"
 
@@ -191,7 +197,11 @@ async def get_activity_details(activity_id: str, api_key: str | None = None) -> 
         return f"Invalid activity format for activity {activity_id}."
 
     # Return a more detailed view of the activity
-    detailed_view = format_activity_summary(activity_data)
+    try:
+        detailed_view = format_activity_summary(Activity.from_dict(activity_data))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.error("Failed to parse activity %s: %s", activity_id, e, exc_info=True)
+        return f"Error: Failed to parse activity data for {activity_id}."
 
     # Add additional details if available
     if "zones" in activity_data:
@@ -236,7 +246,11 @@ async def get_activity_intervals(activity_id: str, api_key: str | None = None) -
         return f"No interval data or unrecognized format for activity {activity_id}."
 
     # Format the intervals data
-    return format_intervals(result)
+    try:
+        return format_intervals(IntervalsData.from_dict(result))
+    except (TypeError, KeyError, ValueError) as e:
+        logger.error("Failed to parse intervals for %s: %s", activity_id, e, exc_info=True)
+        return f"Error: Failed to parse interval data for activity {activity_id}."
 
 
 @mcp.tool()
@@ -342,9 +356,19 @@ async def get_activity_messages(activity_id: str, api_key: str | None = None) ->
         return f"No messages found for activity {activity_id}."
 
     output = f"Messages for activity {activity_id}:\n\n"
+    appended_count = 0
     for msg in messages:
         if isinstance(msg, dict):
-            output += format_activity_message(msg) + "\n\n"
+            try:
+                output += format_activity_message(ActivityMessage.from_dict(msg)) + "\n\n"
+                appended_count += 1
+            except (TypeError, KeyError, ValueError) as e:
+                logger.error("Failed to format message: %s", e, exc_info=True)
+                output += "[Message could not be displayed]\n\n"
+                appended_count += 1
+
+    if appended_count == 0:
+        output += "[No messages could be displayed]\n\n"
 
     return output
 

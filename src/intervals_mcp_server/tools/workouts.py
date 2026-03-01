@@ -4,14 +4,17 @@ Workout library and bulk create MCP tools for Intervals.icu.
 This module contains tools for listing workouts, folders, and creating workouts in bulk.
 """
 
+import logging
+
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.formatting import format_folder_summary, format_workout
+from intervals_mcp_server.utils.schemas import Folder, Workout
 from intervals_mcp_server.utils.validation import resolve_athlete_id
 
-# Import mcp instance from shared module for tool registration
-from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
+from intervals_mcp_server.mcp_instance import mcp
 
+logger = logging.getLogger(__name__)
 config = get_config()
 
 
@@ -42,9 +45,16 @@ async def list_workouts(
     if not workouts:
         return "No workouts in library."
 
-    return "Workout library:\n\n" + "\n".join(
-        format_workout(w).strip() for w in workouts if isinstance(w, dict)
-    )
+    formatted = []
+    for w in workouts:
+        if isinstance(w, dict):
+            try:
+                formatted.append(format_workout(Workout.from_dict(w)).strip())
+            except (TypeError, KeyError, ValueError) as e:
+                wid = w.get("id", "unknown")
+                logger.error("Failed to format workout %s: %s", wid, e, exc_info=True)
+                formatted.append(f"[Workout {wid}: failed to format]")
+    return "Workout library:\n\n" + "\n".join(formatted) if formatted else "No workouts in library."
 
 
 @mcp.tool()
@@ -74,9 +84,16 @@ async def list_folders(
     if not folders:
         return "No folders found."
 
-    return "Folders:\n\n" + "\n\n".join(
-        format_folder_summary(f) for f in folders if isinstance(f, dict)
-    )
+    formatted = []
+    for f in folders:
+        if isinstance(f, dict):
+            try:
+                formatted.append(format_folder_summary(Folder.from_dict(f)))
+            except (TypeError, KeyError, ValueError) as e:
+                fid = f.get("id", "unknown")
+                logger.error("Failed to format folder %s: %s", fid, e, exc_info=True)
+                formatted.append(f"[Folder {fid}: failed to format]")
+    return "Folders:\n\n" + "\n\n".join(formatted) if formatted else "No folders found."
 
 
 @mcp.tool()
@@ -111,5 +128,6 @@ async def create_bulk_workouts(
     if isinstance(result, dict) and result.get("error"):
         return f"Error creating bulk workouts: {result.get('message', 'Unknown error')}"
 
-    created = result if isinstance(result, list) else []
-    return f"Successfully created {len(created)} workout(s)."
+    if not isinstance(result, list):
+        return f"Error creating bulk workouts: unexpected response: {result}"
+    return f"Successfully created {len(result)} workout(s)."
