@@ -7,6 +7,8 @@ Training Metrics:
 - Ramp Rate: 6.997368
 - CTL Load: 299
 - ATL Load: 299
+- Form (TSB): -21.1
+- Form %: -29.8%
 
 Sport-Specific Info:
 - Ride: eFTP = 282.85992

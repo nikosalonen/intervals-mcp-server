@@ -116,7 +116,7 @@ Tailwind %: {_fmt(activity.tailwind_percent)}%
 Training Metrics:
 Fitness (CTL): {_fmt(activity.icu_ctl)}
 Fatigue (ATL): {_fmt(activity.icu_atl)}
-TRIMP: {_fmt(activity.trimp)}
+{_format_activity_form(activity.icu_ctl, activity.icu_atl)}TRIMP: {_fmt(activity.trimp)}
 Polarization Index: {_fmt(activity.polarization_index)}
 Power Load: {_fmt(activity.power_load)}
 HR Load: {_fmt(activity.hr_load)}
@@ -147,6 +147,31 @@ TSS: {_fmt(workout.icu_training_load)}
 """
 
 
+def _calculate_form(ctl: float | None, atl: float | None) -> tuple[float | None, float | None]:
+    """Calculate TSB and Form % from CTL and ATL.
+
+    Returns:
+        Tuple of (tsb, form_percent) where tsb = CTL - ATL
+        and form_percent = (CTL - ATL) / CTL * 100.
+    """
+    if ctl is not None and atl is not None:
+        tsb = ctl - atl
+        form_pct = (tsb / ctl * 100) if ctl != 0 else None
+        return tsb, form_pct
+    return None, None
+
+
+def _format_activity_form(ctl: float | None, atl: float | None) -> str:
+    """Format Form/TSB lines for activity summary. Returns empty string if not calculable."""
+    tsb, form_pct = _calculate_form(ctl, atl)
+    lines = ""
+    if tsb is not None:
+        lines += f"Form (TSB): {tsb:.1f}\n"
+    if form_pct is not None:
+        lines += f"Form %: {form_pct:.1f}%\n"
+    return lines
+
+
 def _format_training_metrics(entry: WellnessEntry) -> list[str]:
     """Format training metrics section."""
     training_metrics = []
@@ -159,6 +184,11 @@ def _format_training_metrics(entry: WellnessEntry) -> list[str]:
     ]:
         if value is not None:
             training_metrics.append(f"- {label}: {value}")
+    tsb, form_pct = _calculate_form(entry.ctl, entry.atl)
+    if tsb is not None:
+        training_metrics.append(f"- Form (TSB): {tsb:.1f}")
+    if form_pct is not None:
+        training_metrics.append(f"- Form %: {form_pct:.1f}%")
     return training_metrics
 
 
