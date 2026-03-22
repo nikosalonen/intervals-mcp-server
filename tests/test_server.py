@@ -280,6 +280,41 @@ def test_add_or_update_event(monkeypatch):
     assert '"name": "Test Workout"' in result
 
 
+def test_update_event_without_start_date_preserves_existing_date(monkeypatch):
+    """
+    Test that updating an event without providing start_date does not send
+    start_date_local, so the API preserves the existing event date.
+    """
+    captured_kwargs: dict = {}
+
+    async def fake_put_request(*_args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return {
+            "id": "e456",
+            "start_date_local": "2024-03-31T00:00:00",
+            "category": "WORKOUT",
+            "name": "Updated Workout",
+            "type": "Ride",
+        }
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_put_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_put_request
+    )
+    result = asyncio.run(
+        add_or_update_event(
+            athlete_id="i1",
+            event_id="e456",
+            name="Updated Workout",
+            workout_type="Ride",
+            # start_date intentionally omitted
+        )
+    )
+    assert "Successfully updated event:" in result
+    # The payload sent to the API should NOT contain start_date_local
+    assert "start_date_local" not in captured_kwargs.get("data", {})
+
+
 def test_create_bulk_events(monkeypatch):
     """Test create_bulk_events returns success with count."""
     bulk_response = [

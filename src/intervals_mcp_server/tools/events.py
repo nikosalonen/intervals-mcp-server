@@ -13,7 +13,7 @@ from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.dates import get_default_end_date, get_default_future_end_date
 from intervals_mcp_server.utils.formatting import format_event_details, format_event_summary
-from intervals_mcp_server.utils.schemas import EventRequest, EventResponse
+from intervals_mcp_server.utils.schemas import EventResponse
 from intervals_mcp_server.utils.types import WorkoutDoc
 from intervals_mcp_server.utils.validation import resolve_athlete_id, validate_date
 
@@ -44,7 +44,7 @@ def _resolve_workout_type(name: str | None, workout_type: str | None) -> str:
 def _prepare_event_data(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     name: str,
     workout_type: str,
-    start_date: str,
+    start_date: str | None,
     workout_doc: WorkoutDoc | None,
     moving_time: int | None,
     distance: int | None,
@@ -53,18 +53,25 @@ def _prepare_event_data(  # pylint: disable=too-many-arguments,too-many-position
     """Prepare event data dictionary for API request.
 
     Many arguments are required to match the Intervals.icu API event structure.
+    When start_date is None (update without explicit date), start_date_local is omitted
+    so the API preserves the existing event date.
     """
     resolved_workout_type = _resolve_workout_type(name, workout_type)
     resolved_description = description if description is not None else (str(workout_doc) if workout_doc else None)
-    return EventRequest(
-        start_date_local=start_date + "T00:00:00",
-        category="WORKOUT",
-        name=name,
-        type=resolved_workout_type,
-        description=resolved_description,
-        moving_time=moving_time,
-        distance=distance,
-    ).to_dict()
+    data: dict[str, Any] = {
+        "category": "WORKOUT",
+        "name": name,
+        "type": resolved_workout_type,
+    }
+    if start_date is not None:
+        data["start_date_local"] = start_date + "T00:00:00"
+    if resolved_description is not None:
+        data["description"] = resolved_description
+    if moving_time is not None:
+        data["moving_time"] = moving_time
+    if distance is not None:
+        data["distance"] = distance
+    return data
 
 
 def _handle_event_response(
@@ -386,7 +393,9 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
     if error_msg:
         return error_msg
 
-    if not start_date:
+    # Only default start_date to today for new events, not updates.
+    # For updates without start_date, we omit it so the API preserves the existing date.
+    if not start_date and not event_id:
         start_date = datetime.now().strftime("%Y-%m-%d")
 
     try:
@@ -394,7 +403,7 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
             name, workout_type, start_date, workout_doc, moving_time, distance, description
         )
         return await _create_or_update_event_request(
-            athlete_id_to_use, api_key, event_data, start_date, event_id
+            athlete_id_to_use, api_key, event_data, start_date or "existing", event_id
         )
     except ValueError as e:
         return f"Error: {e}"
