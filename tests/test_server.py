@@ -117,6 +117,7 @@ def test_get_events(monkeypatch):
     event = {
         "date": "2024-01-01",
         "id": "e1",
+        "uid": "abc-123-def",
         "name": "Test Event",
         "description": "desc",
         "race": True,
@@ -131,6 +132,7 @@ def test_get_events(monkeypatch):
     result = asyncio.run(get_events(athlete_id="i1", start_date="2024-01-01", end_date="2024-01-02"))
     assert "Test Event" in result
     assert "Events:" in result
+    assert "UID: abc-123-def" in result
 
 
 def test_get_event_by_id(monkeypatch):
@@ -139,6 +141,7 @@ def test_get_event_by_id(monkeypatch):
     """
     event = {
         "id": "e1",
+        "uid": "abc-123-def",
         "date": "2024-01-01",
         "name": "Test Event",
         "description": "desc",
@@ -154,6 +157,7 @@ def test_get_event_by_id(monkeypatch):
     result = asyncio.run(get_event_by_id("e1", athlete_id="i1"))
     assert "Event Details:" in result
     assert "Test Event" in result
+    assert "UID: abc-123-def" in result
 
 
 def test_get_wellness_data(monkeypatch):

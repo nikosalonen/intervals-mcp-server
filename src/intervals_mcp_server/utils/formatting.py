@@ -387,22 +387,29 @@ def format_event_summary(event: EventResponse) -> str:
     lines = [
         f"Date: {_fmt(event.start_date_local, 'Unknown')}",
         f"ID: {_fmt(event.id)}",
+    ]
+    if event.uid is not None:
+        lines.append(f"UID: {event.uid}")
+    lines.extend([
         f"Category: {_fmt(event.category, 'Unknown')}",
         f"Type: {_fmt(event.type, 'Unknown')}",
         f"Name: {_fmt(event.name, 'Unnamed')}",
         f"Color: {_fmt(event.color)}",
-        f"For Week: {event.for_week}" if event.for_week else None,
-        f"Show As Note: {event.show_as_note}" if event.show_as_note else None,
-        f"Description: {_fmt(event.description, 'No description')}",
-    ]
-    return "\n".join(line for line in lines if line is not None)
+    ])
+    if event.for_week:
+        lines.append(f"For Week: {event.for_week}")
+    if event.show_as_note:
+        lines.append(f"Show As Note: {event.show_as_note}")
+    lines.append(f"Description: {_fmt(event.description, 'No description')}")
+    return "\n".join(lines)
 
 
 def format_event_details(event: EventResponse) -> str:
     """Format detailed event information into a readable string."""
+    uid_line = f"\nUID: {event.uid}" if event.uid is not None else ""
     event_details = f"""Event Details:
 
-ID: {_fmt(event.id)}
+ID: {_fmt(event.id)}{uid_line}
 Date: {_fmt(event.start_date_local, "Unknown")}
 Category: {_fmt(event.category, "Unknown")}
 Type: {_fmt(event.type, "Unknown")}
