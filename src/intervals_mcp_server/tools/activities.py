@@ -118,7 +118,7 @@ async def get_activities(  # pylint: disable=too-many-arguments,too-many-return-
     """Get a list of activities for an athlete from Intervals.icu
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         start_date: Start date in YYYY-MM-DD format (optional, defaults to 30 days ago)
         end_date: End date in YYYY-MM-DD format (optional, defaults to today)

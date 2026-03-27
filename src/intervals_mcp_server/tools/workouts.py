@@ -26,7 +26,7 @@ async def list_workouts(
     """List all workouts in the athlete's workout library.
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided).
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically.
         api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided).
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
@@ -65,7 +65,7 @@ async def list_folders(
     """List workout folders with their child workouts.
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided).
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically.
         api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided).
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
@@ -107,7 +107,7 @@ async def create_bulk_workouts(
     Pass a list of workout objects (each with name, sport, intervals, etc. as per Intervals.icu API).
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided).
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically.
         workouts: List of workout objects to create.
         api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided).
     """

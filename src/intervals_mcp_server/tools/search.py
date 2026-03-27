@@ -46,7 +46,7 @@ async def search_activities(
     """Search activities by name or tag.
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided).
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically.
         q: Search query (name or tag).
         limit: Maximum number of results (optional).
         api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided).
@@ -92,7 +92,7 @@ async def search_intervals(
     """Find activities that contain intervals matching duration and intensity range.
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided).
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically.
         duration_seconds: Interval duration in seconds to match.
         intensity_min: Minimum intensity (e.g. 0.9 for 90% FTP).
         intensity_max: Maximum intensity.

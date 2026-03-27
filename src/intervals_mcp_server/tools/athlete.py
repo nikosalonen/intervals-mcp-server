@@ -30,7 +30,7 @@ async def get_athlete(
     """Get athlete profile (weight, resting HR, location, timezone, status) from Intervals.icu.
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided).
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically.
         api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided).
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
@@ -66,7 +66,7 @@ async def get_sport_settings(
     Returns all sport types if sport_type is omitted, or a single sport's settings if sport_type is provided (e.g. 'Run', 'Ride').
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided).
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically.
         sport_type: Optional sport type to return only that sport's settings.
         api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided).
     """
@@ -120,7 +120,7 @@ async def get_training_plan(
     Returns the training plan with its workouts, including day offsets, sport types, and durations.
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided).
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically.
         api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided).
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)

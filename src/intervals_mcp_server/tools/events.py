@@ -131,7 +131,7 @@ async def get_events(
     """Get events for an athlete from Intervals.icu
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         start_date: Start date in YYYY-MM-DD format (optional, defaults to today)
         end_date: End date in YYYY-MM-DD format (optional, defaults to 30 days from today)
@@ -196,7 +196,7 @@ async def get_event_by_id(
 
     Args:
         event_id: The Intervals.icu event ID
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
     """
     # Resolve athlete ID
@@ -237,7 +237,7 @@ async def delete_event(
 
     Args:
         event_id: The Intervals.icu event ID
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
@@ -289,7 +289,7 @@ async def delete_events_by_date_range(
     Args:
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
@@ -326,7 +326,7 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
     Many arguments are required as this MCP tool function maps directly to the Intervals.icu API parameters.
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         event_id: The Intervals.icu event ID (optional). If provided, the existing event is updated; if omitted, a new event is created.
         start_date: Start date in YYYY-MM-DD format (optional, defaults to today)
@@ -480,7 +480,7 @@ async def create_bulk_events(
             - indoor: Whether workout is indoors
             - color: Event color
             - tags: List of tag strings
-        athlete_id: The Intervals.icu athlete ID (optional, uses ATHLETE_ID from env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided)
         upsert_on_uid: If true, update events with matching uid instead of creating new ones.
             For events with category=TARGET, existing matching targets for the date and type are updated.

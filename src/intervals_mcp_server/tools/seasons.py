@@ -33,7 +33,7 @@ async def list_seasons(
     phases (e.g. "Base", "Build", "Peak").
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         start_date: Start date in YYYY-MM-DD format (optional, defaults to 1 year ago)
         end_date: End date in YYYY-MM-DD format (optional, defaults to 1 year from now)
@@ -97,7 +97,7 @@ async def create_season(
     Args:
         name: Name of the season (e.g. "Base", "Build", "Peak", "Race")
         start_date: Start date in YYYY-MM-DD format
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         end_date: End date in YYYY-MM-DD format (optional)
         description: Season description (optional)
@@ -156,7 +156,7 @@ async def update_season(
 
     Args:
         event_id: The Intervals.icu event ID of the season to update
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         name: New name for the season (optional)
         start_date: New start date in YYYY-MM-DD format (optional)

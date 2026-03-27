@@ -28,7 +28,7 @@ async def get_custom_items(
     """Get custom items (charts, custom fields, zones, etc.) for an athlete from Intervals.icu
 
     Args:
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
@@ -73,7 +73,7 @@ async def get_custom_item_by_id(
 
     Args:
         item_id: The custom item ID
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
@@ -112,7 +112,7 @@ async def create_custom_item(
     Args:
         name: Name of the custom item
         item_type: Type of custom item (e.g. FITNESS_CHART, TRACE_CHART, INPUT_FIELD, ACTIVITY_FIELD, INTERVAL_FIELD, ACTIVITY_STREAM, ACTIVITY_CHART, ACTIVITY_HISTOGRAM, ACTIVITY_HEATMAP, ACTIVITY_MAP, ACTIVITY_PANEL, ZONES)
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         description: Description of the custom item (optional)
         content: Configuration content for the custom item as a dict (optional). Important enum values:
@@ -173,7 +173,7 @@ async def update_custom_item(
 
     Args:
         item_id: The custom item ID to update
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         name: New name for the custom item (optional)
         item_type: New type for the custom item (optional)
@@ -235,7 +235,7 @@ async def delete_custom_item(
 
     Args:
         item_id: The custom item ID to delete
-        athlete_id: The Intervals.icu athlete ID (optional, will use ATHLETE_ID from .env if not provided)
+        athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
