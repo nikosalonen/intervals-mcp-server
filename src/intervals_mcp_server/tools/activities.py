@@ -117,6 +117,8 @@ async def get_activities(  # pylint: disable=too-many-arguments,too-many-return-
 ) -> str:
     """Get a list of activities for an athlete from Intervals.icu
 
+    Feel values: 1=Great, 2=Good, 3=OK, 4=Bad, 5=Terrible.
+
     Args:
         athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
@@ -175,6 +177,8 @@ async def get_activities(  # pylint: disable=too-many-arguments,too-many-return-
 @mcp.tool()
 async def get_activity_details(activity_id: str, api_key: str | None = None) -> str:
     """Get detailed information for a specific activity from Intervals.icu
+
+    Feel values: 1=Great, 2=Good, 3=OK, 4=Bad, 5=Terrible.
 
     Args:
         activity_id: The Intervals.icu activity ID
