@@ -50,6 +50,9 @@ def _prepare_event_data(  # pylint: disable=too-many-arguments,too-many-position
     distance: int | None,
     description: str | None = None,
     color: str | None = None,
+    category: str = "WORKOUT",
+    for_week: bool | None = None,
+    show_as_note: bool | None = None,
 ) -> dict[str, Any]:
     """Prepare event data dictionary for API request.
 
@@ -60,7 +63,7 @@ def _prepare_event_data(  # pylint: disable=too-many-arguments,too-many-position
     resolved_workout_type = _resolve_workout_type(name, workout_type)
     resolved_description = description if description is not None else (str(workout_doc) if workout_doc else None)
     data: dict[str, Any] = {
-        "category": "WORKOUT",
+        "category": category,
         "name": name,
         "type": resolved_workout_type,
     }
@@ -74,6 +77,10 @@ def _prepare_event_data(  # pylint: disable=too-many-arguments,too-many-position
         data["distance"] = distance
     if color is not None:
         data["color"] = color
+    if for_week is not None:
+        data["for_week"] = for_week
+    if show_as_note is not None:
+        data["show_as_note"] = show_as_note
     return data
 
 
@@ -209,7 +216,7 @@ async def get_event_by_id(
 
     # Call the Intervals.icu API
     result = await make_intervals_request(
-        url=f"/athlete/{athlete_id_to_use}/event/{event_id}", api_key=api_key
+        url=f"/athlete/{athlete_id_to_use}/events/{event_id}", api_key=api_key
     )
 
     if isinstance(result, dict) and "error" in result:
@@ -323,6 +330,9 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
     moving_time: int | None = None,
     distance: int | None = None,
     color: str | None = None,
+    category: str = "WORKOUT",
+    for_week: bool | None = None,
+    show_as_note: bool | None = None,
 ) -> str:
     """Post event for an athlete to Intervals.icu this follows the event api from intervals.icu
     If event_id is provided, the event will be updated instead of created.
@@ -344,6 +354,12 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
         moving_time: Total expected moving time of the workout in seconds (optional)
         distance: Total expected distance of the workout in meters (optional)
         color: Event color as a hex string e.g. "#FF5733" (optional)
+        category: Event category (WORKOUT, NOTE, RACE_A, RACE_B, RACE_C, SEASON_START, etc.). Defaults to WORKOUT.
+        for_week: When true, the event displays as a week-level note spanning the entire week in the
+            calendar UI. Place on the Monday of the target week. Typically used with category=NOTE
+            and show_as_note=true. (optional, default false)
+        show_as_note: When true, the event displays as a text note rather than a structured workout
+            block. Does not appear on the fitness chart. (optional, default false)
 
     Example:
         "workout_doc": {
@@ -405,7 +421,8 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
 
     try:
         event_data = _prepare_event_data(
-            name, workout_type, start_date, workout_doc, moving_time, distance, description, color
+            name, workout_type, start_date, workout_doc, moving_time, distance, description, color,
+            category, for_week, show_as_note
         )
         return await _create_or_update_event_request(
             athlete_id_to_use, api_key, event_data, start_date or "existing", event_id
@@ -425,6 +442,8 @@ _OPTIONAL_FIELD_TYPES: dict[str, type | tuple[type, ...]] = {
     "indoor": bool,
     "color": str,
     "tags": list,
+    "for_week": bool,
+    "show_as_note": bool,
 }
 
 
@@ -485,6 +504,10 @@ async def create_bulk_events(
             - indoor: Whether workout is indoors
             - color: Event color
             - tags: List of tag strings
+            - for_week: When true, displays as a week-level note spanning the entire week.
+              Place on Monday of the target week. Typically used with category=NOTE and show_as_note=true.
+            - show_as_note: When true, displays as a text note rather than a workout block.
+              Does not appear on the fitness chart.
         athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, uses API_KEY from env if not provided)
         upsert_on_uid: If true, update events with matching uid instead of creating new ones.
@@ -507,6 +530,14 @@ async def create_bulk_events(
                 "category": "NOTE",
                 "name": "Rest Day",
                 "uid": "plan-w1-wed"
+            },
+            {
+                "start_date_local": "2024-03-11T00:00:00",
+                "category": "NOTE",
+                "name": "Week 1 Notes",
+                "for_week": true,
+                "show_as_note": true,
+                "description": "Coach notes:\\n- Focus on easy aerobic volume"
             }
         ]
     """

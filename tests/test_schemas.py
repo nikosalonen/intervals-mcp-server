@@ -240,6 +240,24 @@ def test_event_response_from_dict_basic():
     assert e.name == "Long Ride"
     assert e.race is False
     assert e.workout is None
+    assert e.for_week is None
+    assert e.show_as_note is None
+
+
+def test_event_response_from_dict_with_week_note_fields():
+    """EventResponse.from_dict() maps for_week and show_as_note fields."""
+    data = {
+        "id": 100,
+        "start_date_local": "2024-08-05T00:00:00",
+        "name": "Week 1 Notes",
+        "category": "NOTE",
+        "for_week": True,
+        "show_as_note": True,
+    }
+    e = EventResponse.from_dict(data)
+    assert e.for_week is True
+    assert e.show_as_note is True
+    assert e.category == "NOTE"
 
 
 def test_event_response_from_dict_with_workout():

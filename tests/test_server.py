@@ -280,6 +280,34 @@ def test_add_or_update_event(monkeypatch):
     assert '"name": "Test Workout"' in result
 
 
+def test_add_or_update_event_with_week_note_fields(monkeypatch):
+    """Test add_or_update_event passes for_week and show_as_note to the API."""
+    captured_kwargs: dict = {}
+
+    async def fake_request(*_args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return {"id": "e200", "name": "Week Notes", "category": "NOTE"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.events.make_intervals_request", fake_request)
+    result = asyncio.run(
+        add_or_update_event(
+            athlete_id="i1",
+            start_date="2024-03-11",
+            name="Week Notes",
+            workout_type="Other",
+            category="NOTE",
+            for_week=True,
+            show_as_note=True,
+        )
+    )
+    assert "Successfully created event:" in result
+    data = captured_kwargs.get("data", {})
+    assert data["for_week"] is True
+    assert data["show_as_note"] is True
+    assert data["category"] == "NOTE"
+
+
 def test_update_event_without_start_date_preserves_existing_date(monkeypatch):
     """
     Test that updating an event without providing start_date does not send
