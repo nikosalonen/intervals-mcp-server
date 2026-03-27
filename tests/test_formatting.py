@@ -102,6 +102,34 @@ def test_format_event_summary():
     assert "Color: #FF0000" in summary
 
 
+def test_format_event_summary_with_week_note():
+    """Test that format_event_summary includes for_week and show_as_note when set."""
+    event = {
+        "start_date_local": "2024-03-11T00:00:00",
+        "id": "e2",
+        "name": "Week Notes",
+        "category": "NOTE",
+        "for_week": True,
+        "show_as_note": True,
+    }
+    summary = format_event_summary(EventResponse.from_dict(event))
+    assert "For Week: True" in summary
+    assert "Show As Note: True" in summary
+
+
+def test_format_event_summary_omits_week_fields_when_false():
+    """Test that format_event_summary omits for_week and show_as_note when false/None."""
+    event = {
+        "start_date_local": "2024-03-11T00:00:00",
+        "id": "e3",
+        "name": "Regular Event",
+        "category": "WORKOUT",
+    }
+    summary = format_event_summary(EventResponse.from_dict(event))
+    assert "For Week" not in summary
+    assert "Show As Note" not in summary
+
+
 def test_format_event_details():
     """
     Test that format_event_details returns a string containing event and workout details.

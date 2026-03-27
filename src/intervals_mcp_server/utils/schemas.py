@@ -916,6 +916,8 @@ class EventResponse:
     result: str | None = None
     workout: EventWorkout | None = None
     calendar: Any = None
+    for_week: bool | None = None
+    show_as_note: bool | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "EventResponse":
@@ -942,6 +944,8 @@ class EventResponse:
                 else None
             ),
             calendar=data.get("calendar"),
+            for_week=data.get("for_week"),
+            show_as_note=data.get("show_as_note"),
         )
 
 

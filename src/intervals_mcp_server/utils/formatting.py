@@ -391,9 +391,11 @@ def format_event_summary(event: EventResponse) -> str:
         f"Type: {_fmt(event.type, 'Unknown')}",
         f"Name: {_fmt(event.name, 'Unnamed')}",
         f"Color: {_fmt(event.color)}",
+        f"For Week: {event.for_week}" if event.for_week else None,
+        f"Show As Note: {event.show_as_note}" if event.show_as_note else None,
         f"Description: {_fmt(event.description, 'No description')}",
     ]
-    return "\n".join(lines)
+    return "\n".join(line for line in lines if line is not None)
 
 
 def format_event_details(event: EventResponse) -> str:
@@ -405,8 +407,12 @@ Date: {_fmt(event.start_date_local, "Unknown")}
 Category: {_fmt(event.category, "Unknown")}
 Type: {_fmt(event.type, "Unknown")}
 Name: {_fmt(event.name, "Unnamed")}
-Color: {_fmt(event.color)}
-Description: {_fmt(event.description, "No description")}"""
+Color: {_fmt(event.color)}"""
+    if event.for_week:
+        event_details += f"\nFor Week: {event.for_week}"
+    if event.show_as_note:
+        event_details += f"\nShow As Note: {event.show_as_note}"
+    event_details += f"\nDescription: {_fmt(event.description, 'No description')}"
 
     if event.workout is not None:
         workout: EventWorkout = event.workout
