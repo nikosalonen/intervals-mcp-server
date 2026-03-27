@@ -518,25 +518,83 @@ async def create_bulk_events(
     if validation_errors:
         return "Invalid event data:\n" + "\n".join(validation_errors)
 
-    params: dict[str, Any] = {
-        "upsertOnUid": upsert_on_uid,
-        "updatePlanApplied": update_plan_applied,
-    }
+    # Split events: those with 'id' are updated individually via PUT,
+    # those without are created via bulk POST.
+    events_to_update = [e for e in events if "id" in e and e["id"] is not None]
+    events_to_create = [e for e in events if "id" not in e or e["id"] is None]
 
-    result = await make_intervals_request(
-        url=f"/athlete/{athlete_id_to_use}/events/bulk",
-        api_key=api_key,
-        method="POST",
-        data=events,
-        params=params,
-    )
+    updated_count = 0
+    update_failures: list[str] = []
 
-    if isinstance(result, dict) and "error" in result:
-        return f"Error creating bulk events: {result.get('message', 'Unknown error')}"
+    for event in events_to_update:
+        event_id = str(event["id"])
+        event_data = {k: v for k, v in event.items() if k != "id"}
+        result = await make_intervals_request(
+            url=f"/athlete/{athlete_id_to_use}/events/{event_id}",
+            api_key=api_key,
+            method="PUT",
+            data=event_data,
+        )
+        if isinstance(result, dict) and "error" in result:
+            reason = result.get("message", "unknown error")
+            update_failures.append(f"{event_id} ({reason})")
+        else:
+            updated_count += 1
 
-    if not isinstance(result, list):
-        return f"Error creating bulk events: unexpected response: {result}"
-    return f"Successfully created/updated {len(result)} event(s)."
+    created_count = 0
+    create_error: str | None = None
+
+    if events_to_create:
+        params: dict[str, Any] = {
+            "upsertOnUid": upsert_on_uid,
+            "updatePlanApplied": update_plan_applied,
+        }
+        result = await make_intervals_request(
+            url=f"/athlete/{athlete_id_to_use}/events/bulk",
+            api_key=api_key,
+            method="POST",
+            data=events_to_create,
+            params=params,
+        )
+        if isinstance(result, dict) and "error" in result:
+            create_error = result.get("message", "Unknown error")
+        elif isinstance(result, list):
+            created_count = len(result)
+        else:
+            create_error = f"unexpected response: {result}"
+
+    return _format_bulk_result(created_count, updated_count, update_failures, create_error)
+
+
+def _format_bulk_result(
+    created_count: int,
+    updated_count: int,
+    update_failures: list[str],
+    create_error: str | None,
+) -> str:
+    """Format the result message for bulk event operations."""
+    parts: list[str] = []
+    if created_count:
+        parts.append(f"created {created_count}")
+    if updated_count:
+        parts.append(f"updated {updated_count}")
+    if parts:
+        msg = f"Successfully {' and '.join(parts)} event(s)."
+    else:
+        msg = ""
+
+    errors: list[str] = []
+    if update_failures:
+        errors.append(f"Failed to update: {', '.join(update_failures)}")
+    if create_error:
+        errors.append(f"Bulk create error: {create_error}")
+
+    if errors:
+        error_msg = " ".join(errors)
+        return f"{msg} {error_msg}".strip() if msg else error_msg
+    if not msg:
+        return "No events processed."
+    return msg
 
 
 async def _create_or_update_event_request(

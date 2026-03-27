@@ -338,7 +338,7 @@ def test_create_bulk_events(monkeypatch):
             ],
         )
     )
-    assert "Successfully created/updated 2 event(s)" in result
+    assert "Successfully created 2 event(s)" in result
 
 
 def test_create_bulk_events_empty(monkeypatch):
@@ -362,7 +362,7 @@ def test_create_bulk_events_error(monkeypatch):
             events=[{"start_date_local": "2024-03-15T00:00:00", "category": "WORKOUT", "name": "Bad"}],
         )
     )
-    assert "Error creating bulk events" in result
+    assert "Bulk create error" in result
     assert "Invalid event data" in result
 
 
@@ -386,7 +386,7 @@ def test_create_bulk_events_passes_upsert_params(monkeypatch):
             update_plan_applied=True,
         )
     )
-    assert "Successfully created/updated 1 event(s)" in result
+    assert "Successfully created 1 event(s)" in result
     assert captured_kwargs["params"]["upsertOnUid"] is True
     assert captured_kwargs["params"]["updatePlanApplied"] is True
 
@@ -501,6 +501,127 @@ def test_create_bulk_events_rejects_boolean_for_numeric_fields(monkeypatch):
     assert "'moving_time' must be a number" in result
     assert "'distance' must be a number" in result
     assert not api_called
+
+
+def test_create_bulk_events_updates_by_id(monkeypatch):
+    """Test that events with an 'id' field are routed to individual PUT requests."""
+    calls = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        return {"id": 123, "name": "Updated Event"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        create_bulk_events(
+            athlete_id="i1",
+            events=[
+                {
+                    "id": 123,
+                    "start_date_local": "2024-03-15T00:00:00",
+                    "category": "WORKOUT",
+                    "name": "Updated Run",
+                    "type": "Run",
+                },
+            ],
+        )
+    )
+    # Should use PUT to /events/123, not POST to /events/bulk
+    assert any("/events/123" in c.get("url", "") for c in calls), f"Expected PUT to /events/123, got: {calls}"
+    assert any(c.get("method") == "PUT" for c in calls), f"Expected PUT method, got: {calls}"
+    assert "updated 1" in result.lower()
+
+
+def test_create_bulk_events_mixed_create_and_update(monkeypatch):
+    """Test mixed events: those with 'id' update via PUT, those without go to bulk POST."""
+    calls = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        url = kwargs.get("url", "")
+        if "bulk" in url:
+            return [{"id": 2, "name": "New Event"}]
+        return {"id": 1, "name": "Updated Event"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        create_bulk_events(
+            athlete_id="i1",
+            events=[
+                {
+                    "id": 1,
+                    "start_date_local": "2024-03-15T00:00:00",
+                    "category": "WORKOUT",
+                    "name": "Updated Run",
+                    "type": "Run",
+                },
+                {
+                    "start_date_local": "2024-03-16T00:00:00",
+                    "category": "NOTE",
+                    "name": "New Note",
+                },
+            ],
+        )
+    )
+    put_calls = [c for c in calls if c.get("method") == "PUT"]
+    bulk_calls = [c for c in calls if "bulk" in c.get("url", "")]
+    assert len(put_calls) == 1, f"Expected 1 PUT call, got {len(put_calls)}"
+    assert len(bulk_calls) == 1, f"Expected 1 bulk call, got {len(bulk_calls)}"
+    assert "1" in result and "updated" in result.lower()
+    assert "1" in result and "created" in result.lower()
+
+
+def test_create_bulk_events_update_by_id_failure(monkeypatch):
+    """Test that individual update failure is reported but doesn't block other operations."""
+    calls = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        url = kwargs.get("url", "")
+        if "/events/1" in url and "bulk" not in url:
+            return {"error": True, "message": "Not found"}
+        if "bulk" in url:
+            return [{"id": 3, "name": "New Event"}]
+        return {"id": 2, "name": "Updated"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        create_bulk_events(
+            athlete_id="i1",
+            events=[
+                {
+                    "id": 1,
+                    "start_date_local": "2024-03-15T00:00:00",
+                    "category": "WORKOUT",
+                    "name": "Will Fail",
+                    "type": "Run",
+                },
+                {
+                    "id": 2,
+                    "start_date_local": "2024-03-16T00:00:00",
+                    "category": "WORKOUT",
+                    "name": "Will Succeed",
+                    "type": "Run",
+                },
+                {
+                    "start_date_local": "2024-03-17T00:00:00",
+                    "category": "NOTE",
+                    "name": "New Note",
+                },
+            ],
+        )
+    )
+    assert "failed" in result.lower()
+    assert "created" in result.lower() or "updated" in result.lower()
 
 
 def test_get_activity_messages(monkeypatch):
