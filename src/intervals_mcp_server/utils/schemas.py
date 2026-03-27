@@ -903,6 +903,7 @@ class EventResponse:
     """Event response from the Intervals.icu API (Event / EventEx)."""
 
     id: int | None = None
+    uid: str | None = None
     start_date_local: str | None = None
     end_date_local: str | None = None
     name: str | None = None
@@ -925,6 +926,7 @@ class EventResponse:
         workout_data = data.get("workout")
         return cls(
             id=data.get("id"),
+            uid=data.get("uid"),
             start_date_local=_first(
                 data.get("start_date_local"), data.get("date")
             ),
