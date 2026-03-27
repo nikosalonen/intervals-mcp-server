@@ -90,11 +90,16 @@ def test_format_event_summary():
         "id": "e1",
         "name": "Event1",
         "description": "desc",
+        "type": "Run",
+        "category": "RACE_A",
+        "color": "#FF0000",
         "race": True,
     }
     summary = format_event_summary(EventResponse.from_dict(event))
     assert "Date: 2024-01-01" in summary
-    assert "Type: Race" in summary
+    assert "Category: RACE_A" in summary
+    assert "Type: Run" in summary
+    assert "Color: #FF0000" in summary
 
 
 def test_format_event_details():

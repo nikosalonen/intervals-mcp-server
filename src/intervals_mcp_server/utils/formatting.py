@@ -384,12 +384,16 @@ Tags: {tags_str}"""
 
 def format_event_summary(event: EventResponse) -> str:
     """Format a basic event summary into a readable string."""
-    event_type = "Workout" if event.workout else "Race" if event.race else "Other"
-    return f"""Date: {_fmt(event.start_date_local, "Unknown")}
-ID: {_fmt(event.id)}
-Type: {event_type}
-Name: {_fmt(event.name, "Unnamed")}
-Description: {_fmt(event.description, "No description")}"""
+    lines = [
+        f"Date: {_fmt(event.start_date_local, 'Unknown')}",
+        f"ID: {_fmt(event.id)}",
+        f"Category: {_fmt(event.category, 'Unknown')}",
+        f"Type: {_fmt(event.type, 'Unknown')}",
+        f"Name: {_fmt(event.name, 'Unnamed')}",
+        f"Color: {_fmt(event.color)}",
+        f"Description: {_fmt(event.description, 'No description')}",
+    ]
+    return "\n".join(lines)
 
 
 def format_event_details(event: EventResponse) -> str:
@@ -398,7 +402,10 @@ def format_event_details(event: EventResponse) -> str:
 
 ID: {_fmt(event.id)}
 Date: {_fmt(event.start_date_local, "Unknown")}
+Category: {_fmt(event.category, "Unknown")}
+Type: {_fmt(event.type, "Unknown")}
 Name: {_fmt(event.name, "Unnamed")}
+Color: {_fmt(event.color)}
 Description: {_fmt(event.description, "No description")}"""
 
     if event.workout is not None:
