@@ -128,12 +128,10 @@ def test_get_activity_details_with_paired_event(monkeypatch):
         "id": 94520839,
         "description": "Original planned text only.\n\ndid only one set of planks.",
     }
-
-    call_count = 0
+    called_urls = []
 
     async def fake_request(url, **_kwargs):
-        nonlocal call_count
-        call_count += 1
+        called_urls.append(url)
         if "events" in url:
             return event_sample
         return activity_sample
@@ -144,7 +142,100 @@ def test_get_activity_details_with_paired_event(monkeypatch):
     )
     result = asyncio.run(get_activity_details("i135642116"))
     assert "did only one set of planks" in result
-    assert call_count == 2
+    assert any("events" in url for url in called_urls)
+
+
+def test_get_activity_details_paired_event_camel_case_field(monkeypatch):
+    """
+    Test that get_activity_details handles pairedEventId (camelCase) in addition to
+    paired_event_id (snake_case).
+    """
+    activity_sample = {
+        "name": "Strength Workout",
+        "id": "i135642116",
+        "type": "Workout",
+        "startTime": "2026-03-29T00:00:00",
+        "elapsed_time": 900,
+        "pairedEventId": 94520839,
+        "description": "Original planned text only.",
+    }
+    event_sample = {
+        "id": 94520839,
+        "description": "Original planned text only.\n\ndid only one set of planks.",
+    }
+    called_urls = []
+
+    async def fake_request(url, **_kwargs):
+        called_urls.append(url)
+        if "events" in url:
+            return event_sample
+        return activity_sample
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.activities.make_intervals_request", fake_request
+    )
+    result = asyncio.run(get_activity_details("i135642116"))
+    assert "did only one set of planks" in result
+    assert any("events" in url for url in called_urls)
+
+
+def test_get_activity_details_paired_event_fetch_error(monkeypatch):
+    """
+    Test that get_activity_details falls back to the activity's own description when
+    the paired event fetch returns an error dict.
+    """
+    activity_sample = {
+        "name": "Strength Workout",
+        "id": "i135642116",
+        "type": "Workout",
+        "startTime": "2026-03-29T00:00:00",
+        "elapsed_time": 900,
+        "paired_event_id": 94520839,
+        "description": "Original activity description.",
+    }
+
+    async def fake_request(url, **_kwargs):
+        if "events" in url:
+            return {"error": "not_found", "message": "Event not found"}
+        return activity_sample
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.activities.make_intervals_request", fake_request
+    )
+    result = asyncio.run(get_activity_details("i135642116"))
+    assert "Original activity description." in result
+    assert "not_found" not in result
+
+
+def test_get_activity_details_paired_event_no_description(monkeypatch):
+    """
+    Test that get_activity_details keeps the activity's own description when the
+    paired event exists but has no description field.
+    """
+    activity_sample = {
+        "name": "Strength Workout",
+        "id": "i135642116",
+        "type": "Workout",
+        "startTime": "2026-03-29T00:00:00",
+        "elapsed_time": 900,
+        "paired_event_id": 94520839,
+        "description": "Original activity description.",
+    }
+    event_sample = {"id": 94520839}
+
+    async def fake_request(url, **_kwargs):
+        if "events" in url:
+            return event_sample
+        return activity_sample
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.activities.make_intervals_request", fake_request
+    )
+    result = asyncio.run(get_activity_details("i135642116"))
+    assert "Original activity description." in result
 
 
 def test_get_events(monkeypatch):

@@ -206,14 +206,31 @@ async def get_activity_details(activity_id: str, api_key: str | None = None) -> 
     # original planned text.
     paired_event_id = activity_data.get("paired_event_id") or activity_data.get("pairedEventId")
     if paired_event_id:
-        event_result = await make_intervals_request(
-            url=f"/athlete/{config.athlete_id}/events/{paired_event_id}",
-            api_key=api_key,
-        )
-        if isinstance(event_result, dict) and "error" not in event_result:
-            event_desc = event_result.get("description")
-            if event_desc:
-                activity_data = {**activity_data, "description": event_desc}
+        try:
+            event_result = await make_intervals_request(
+                url=f"/athlete/{config.athlete_id}/events/{paired_event_id}",
+                api_key=api_key,
+            )
+            if isinstance(event_result, dict) and "error" not in event_result:
+                event_desc = event_result.get("description")
+                activity_desc = activity_data.get("description") or ""
+                if event_desc and event_desc != activity_desc:
+                    activity_data = {**activity_data, "description": event_desc}
+            else:
+                logger.warning(
+                    "Failed to fetch paired event %s for activity %s: %s",
+                    paired_event_id,
+                    activity_id,
+                    event_result,
+                )
+        except Exception:
+            # Enrichment-only fetch — gracefully degrade rather than failing the whole tool
+            logger.warning(
+                "Unexpected error fetching paired event %s for activity %s; continuing without event description.",
+                paired_event_id,
+                activity_id,
+                exc_info=True,
+            )
 
     # Return a more detailed view of the activity
     try:
