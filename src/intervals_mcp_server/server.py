@@ -109,6 +109,7 @@ from intervals_mcp_server.tools.athlete import (  # pylint: disable=wrong-import
     get_athlete,
     get_sport_settings,
     get_training_plan,
+    update_sport_settings,
 )
 from intervals_mcp_server.tools.search import (  # pylint: disable=wrong-import-position  # noqa: E402
     search_activities,
@@ -151,6 +152,7 @@ __all__ = [
     "get_athlete",
     "get_sport_settings",
     "get_training_plan",
+    "update_sport_settings",
     "search_activities",
     "search_intervals",
     "list_workouts",
