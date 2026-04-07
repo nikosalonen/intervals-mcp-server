@@ -43,6 +43,7 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     search_activities,
     search_intervals,
     update_season,
+    update_sport_settings,
 )
 from tests.sample_data import (  # pylint: disable=wrong-import-position
     ATHLETE_DATA,
@@ -1774,3 +1775,40 @@ def test_update_season_error(monkeypatch):
     result = asyncio.run(update_season(event_id="9999", athlete_id="i1"))
     assert "Error updating season" in result
     assert "Not found" in result
+
+
+def test_update_sport_settings(monkeypatch):
+    """Update sport settings returns formatted settings on success; payload contains only provided fields."""
+    captured: dict = {}
+
+    async def fake_request(*_args, **kwargs):
+        captured["data"] = kwargs.get("data", {})
+        return SINGLE_SPORT_SETTING_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.athlete.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_sport_settings(sport_type="Ride", ftp=250, lthr=165, athlete_id="i1"))
+    assert "Sport settings updated successfully" in result
+    assert "250" in result
+    assert set(captured["data"].keys()) == {"type", "ftp", "lthr"}
+
+
+def test_update_sport_settings_error(monkeypatch):
+    """Update sport settings returns error message on API error."""
+
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "Not found"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.athlete.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_sport_settings(sport_type="Ride", ftp=250, athlete_id="i1"))
+    assert "Error updating sport settings" in result
+    assert "Not found" in result
+
+
+def test_update_sport_settings_no_fields():
+    """Update sport settings returns error when no updatable fields are provided."""
+    result = asyncio.run(update_sport_settings(sport_type="Ride", athlete_id="i1"))
+    assert "At least one setting" in result
