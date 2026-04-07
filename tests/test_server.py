@@ -11,6 +11,8 @@ import os
 import pathlib
 import sys
 
+import pytest
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 os.environ.setdefault("API_KEY", "test")
 os.environ.setdefault("ATHLETE_ID", "i1")
@@ -43,6 +45,7 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     search_activities,
     search_intervals,
     update_season,
+    update_sport_settings,
 )
 from tests.sample_data import (  # pylint: disable=wrong-import-position
     ATHLETE_DATA,
@@ -1774,3 +1777,125 @@ def test_update_season_error(monkeypatch):
     result = asyncio.run(update_season(event_id="9999", athlete_id="i1"))
     assert "Error updating season" in result
     assert "Not found" in result
+
+
+def test_update_sport_settings(monkeypatch):
+    """Update sport settings returns formatted settings on success; payload contains only provided fields."""
+    captured: dict = {}
+
+    async def fake_request(*_args, **kwargs):
+        captured["data"] = kwargs.get("data", {})
+        return SINGLE_SPORT_SETTING_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.athlete.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_sport_settings(sport_type="Ride", ftp=250, lthr=165, athlete_id="i1"))
+    assert "Sport settings updated successfully" in result
+    assert "250" in result
+    assert set(captured["data"].keys()) == {"type", "ftp", "lthr"}
+
+
+def test_update_sport_settings_error(monkeypatch):
+    """Update sport settings returns error message on API error."""
+
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "Not found"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.athlete.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_sport_settings(sport_type="Ride", ftp=250, athlete_id="i1"))
+    assert "Error updating sport settings" in result
+    assert "Not found" in result
+
+
+def test_update_sport_settings_no_fields():
+    """Update sport settings returns error when no updatable fields are provided."""
+    result = asyncio.run(update_sport_settings(sport_type="Ride", athlete_id="i1"))
+    assert "At least one setting" in result
+
+
+def test_update_sport_settings_whitespace_sport_type():
+    """Update sport settings returns error for whitespace-only sport_type."""
+    result = asyncio.run(update_sport_settings(sport_type="   ", ftp=250, athlete_id="i1"))
+    assert "sport_type must be a non-empty string" in result
+
+
+@pytest.mark.parametrize(
+    "kwargs,expected_fragment",
+    [
+        ({"ftp": 0}, "ftp must be a positive integer"),
+        ({"ftp": -1}, "ftp must be a positive integer"),
+        ({"lthr": 0}, "lthr must be a positive integer"),
+        ({"max_hr": 0}, "max_hr must be a positive integer"),
+        ({"warmup_time": -1}, "warmup_time must be a non-negative integer"),
+        ({"cooldown_time": -1}, "cooldown_time must be a non-negative integer"),
+        ({"ftp": True}, "ftp must be a positive integer"),
+        ({"ftp": "250"}, "ftp must be a positive integer"),
+    ],
+)
+def test_update_sport_settings_invalid_field(kwargs, expected_fragment):
+    """Update sport settings returns validation error for invalid field values."""
+    result = asyncio.run(update_sport_settings(sport_type="Ride", athlete_id="i1", **kwargs))
+    assert expected_fragment in result
+
+
+def test_update_sport_settings_warmup_zero_is_valid(monkeypatch):
+    """warmup_time=0 and cooldown_time=0 are valid (min_val=0) and are sent in the payload."""
+    captured: dict = {}
+
+    async def fake_request(*_args, **kwargs):
+        captured["data"] = kwargs.get("data", {})
+        return SINGLE_SPORT_SETTING_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.athlete.make_intervals_request", fake_request)
+
+    result = asyncio.run(
+        update_sport_settings(sport_type="Ride", warmup_time=0, cooldown_time=0, athlete_id="i1")
+    )
+    assert "Sport settings updated successfully" in result
+    assert captured["data"].get("warmup") == 0
+    assert captured["data"].get("cooldown") == 0
+
+
+def test_update_sport_settings_all_fields(monkeypatch):
+    """All five optional fields are mapped to the correct API field names in the payload."""
+    captured: dict = {}
+
+    async def fake_request(*_args, **kwargs):
+        captured["data"] = kwargs.get("data", {})
+        return SINGLE_SPORT_SETTING_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.athlete.make_intervals_request", fake_request)
+
+    result = asyncio.run(
+        update_sport_settings(
+            sport_type="Ride",
+            ftp=250,
+            lthr=165,
+            max_hr=185,
+            warmup_time=600,
+            cooldown_time=300,
+            athlete_id="i1",
+        )
+    )
+    assert "Sport settings updated successfully" in result
+    assert set(captured["data"].keys()) == {"type", "ftp", "lthr", "maxHr", "warmup", "cooldown"}
+
+
+def test_update_sport_settings_unexpected_response(monkeypatch):
+    """Update sport settings returns error when API returns a non-dict response."""
+
+    async def fake_request(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.athlete.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_sport_settings(sport_type="Ride", ftp=250, athlete_id="i1"))
+    assert "unexpected response" in result
+
+
