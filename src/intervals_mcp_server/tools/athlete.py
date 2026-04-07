@@ -5,6 +5,7 @@ This module contains tools for retrieving athlete profile and sport settings (FT
 """
 
 import logging
+from typing import Any
 
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
@@ -144,7 +145,7 @@ async def update_sport_settings(
         return "Error: sport_type must be a non-empty string."
     sport_type = sport_type.strip()
 
-    settings: dict[str, int | str] = {}
+    settings: dict[str, Any] = {}
 
     for value, api_field, label, min_val in [
         (lthr, "lthr", "lthr", 1),
@@ -175,6 +176,12 @@ async def update_sport_settings(
         return f"Error updating sport settings: {result.get('message', 'Unknown error')}"
 
     if not isinstance(result, dict):
+        logger.error(
+            "update_sport_settings: unexpected response type %s for sport_type=%r: %r",
+            type(result).__name__,
+            sport_type,
+            result,
+        )
         return "Error updating sport settings: unexpected response."
 
     try:
@@ -182,7 +189,13 @@ async def update_sport_settings(
             AthleteSportSettings.from_dict(result)
         )
     except (TypeError, KeyError, ValueError) as e:
-        logger.error("Failed to format updated sport settings: %s", e, exc_info=True)
+        logger.error(
+            "Failed to format updated sport settings for sport_type=%r, result=%r: %s",
+            sport_type,
+            result,
+            e,
+            exc_info=True,
+        )
         return "Sport settings updated but failed to format response."
 
 

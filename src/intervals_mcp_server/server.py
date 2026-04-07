@@ -41,6 +41,7 @@ Usage:
         - delete_custom_item
         - get_athlete
         - get_sport_settings
+        - update_sport_settings
         - get_training_plan
         - search_activities
         - search_intervals

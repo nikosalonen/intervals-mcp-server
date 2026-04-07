@@ -48,7 +48,7 @@ On success: `"Sport settings updated successfully:\n" + format_sport_settings(At
 
 On API error: `"Error updating sport settings: <message>"`
 
-On validation error (no fields provided): `"Error: at least one setting must be provided."`
+On validation error (no fields provided): `"Error: At least one setting must be provided."`
 
 Reuses existing `AthleteSportSettings.from_dict()` and `format_sport_settings()` — no new formatting or schema code needed.
 
