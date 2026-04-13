@@ -260,7 +260,7 @@ def test_get_events(monkeypatch):
     # Patch in both api.client and tools modules to ensure it works
     monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
     monkeypatch.setattr("intervals_mcp_server.tools.events.make_intervals_request", fake_request)
-    result = asyncio.run(get_events(athlete_id="i1", start_date="2024-01-01", end_date="2024-01-02"))
+    result = asyncio.run(get_events(athlete_id="i1", oldest="2024-01-01", newest="2024-01-02"))
     assert "Test Event" in result
     assert "Events:" in result
     assert "UID: abc-123-def" in result

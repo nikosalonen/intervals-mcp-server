@@ -24,8 +24,8 @@ config = get_config()
 async def list_seasons(
     athlete_id: str | None = None,
     api_key: str | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
+    oldest: str | None = None,
+    newest: str | None = None,
 ) -> str:
     """List training seasons for an athlete from Intervals.icu.
 
@@ -35,19 +35,19 @@ async def list_seasons(
     Args:
         athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
-        start_date: Start date in YYYY-MM-DD format (optional, defaults to 1 year ago)
-        end_date: End date in YYYY-MM-DD format (optional, defaults to 1 year from now)
+        oldest: Oldest date in YYYY-MM-DD format (optional, defaults to 1 year ago)
+        newest: Newest date in YYYY-MM-DD format (optional, defaults to 1 year from now)
     """
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
     if error_msg:
         return error_msg
 
-    if not start_date:
-        start_date = get_default_start_date(days_ago=365)
-    if not end_date:
-        end_date = get_default_future_end_date(days_ahead=365)
+    if not oldest:
+        oldest = get_default_start_date(days_ago=365)
+    if not newest:
+        newest = get_default_future_end_date(days_ahead=365)
 
-    params = {"oldest": start_date, "newest": end_date, "category": "SEASON_START"}
+    params = {"oldest": oldest, "newest": newest, "category": "SEASON_START"}
 
     result = await make_intervals_request(
         url=f"/athlete/{athlete_id_to_use}/events", api_key=api_key, params=params
