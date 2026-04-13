@@ -267,6 +267,91 @@ def test_get_events(monkeypatch):
     assert "UID: abc-123-def" in result
 
 
+def test_get_activities_with_oldest_newest(monkeypatch):
+    """Test get_activities works with explicit oldest/newest params."""
+    sample = {
+        "name": "Morning Ride",
+        "id": 123,
+        "type": "Ride",
+        "startTime": "2024-01-01T08:00:00Z",
+        "distance": 1000,
+        "duration": 3600,
+    }
+
+    async def fake_request(*_args, **_kwargs):
+        return [sample]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.activities.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        get_activities(
+            athlete_id="i1", oldest="2024-01-01", newest="2024-01-02", include_unnamed=True
+        )
+    )
+    assert "Morning Ride" in result
+
+
+def test_get_wellness_data_with_oldest_newest(monkeypatch):
+    """Test get_wellness_data works with explicit oldest/newest params."""
+    wellness = {
+        "2024-01-01": {
+            "id": "2024-01-01",
+            "ctl": 75,
+            "sleepSecs": 28800,
+        }
+    }
+
+    async def fake_request(*_args, **_kwargs):
+        return wellness
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.wellness.make_intervals_request", fake_request)
+    result = asyncio.run(
+        get_wellness_data(athlete_id="i1", oldest="2024-01-01", newest="2024-01-02")
+    )
+    assert "Wellness Data:" in result
+
+
+def test_list_seasons_with_oldest_newest(monkeypatch):
+    """Test list_seasons works with explicit oldest/newest params."""
+
+    async def fake_request(*_args, **_kwargs):
+        return SEASON_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(
+        list_seasons(athlete_id="i1", oldest="2024-01-01", newest="2024-01-02")
+    )
+    assert "Seasons:" in result
+
+
+def test_delete_events_by_date_range_with_oldest_newest(monkeypatch):
+    """Test delete_events_by_date_range works with explicit oldest/newest params."""
+    event = {"id": "e1", "name": "Test Event"}
+    calls = []
+
+    async def fake_request(*args, **kwargs):
+        calls.append(kwargs.get("url", args[0] if args else ""))
+        if "events" in str(kwargs.get("url", args[0] if args else "")):
+            if kwargs.get("method") == "DELETE" or "events/e1" in str(
+                kwargs.get("url", args[0] if args else "")
+            ):
+                return {}
+            return [event]
+        return {}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.events.make_intervals_request", fake_request)
+    result = asyncio.run(
+        delete_events_by_date_range(athlete_id="i1", oldest="2024-01-01", newest="2024-01-02")
+    )
+    assert "Deleted" in result
+
+
 def test_get_event_by_id(monkeypatch):
     """
     Test get_event_by_id returns a formatted string with event details for a given event ID.
