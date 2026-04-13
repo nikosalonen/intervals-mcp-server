@@ -135,16 +135,16 @@ async def _delete_events_list(
 async def get_events(
     athlete_id: str | None = None,
     api_key: str | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
+    oldest: str | None = None,
+    newest: str | None = None,
 ) -> str:
     """Get events for an athlete from Intervals.icu
 
     Args:
         athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
-        start_date: Start date in YYYY-MM-DD format (optional, defaults to today)
-        end_date: End date in YYYY-MM-DD format (optional, defaults to 30 days from today)
+        oldest: Oldest date in YYYY-MM-DD format (optional, defaults to today)
+        newest: Newest date in YYYY-MM-DD format (optional, defaults to 30 days from today)
     """
     # Resolve athlete ID
     athlete_id_to_use, error_msg = resolve_athlete_id(athlete_id, config.athlete_id)
@@ -152,13 +152,13 @@ async def get_events(
         return error_msg
 
     # Parse date parameters (events use different defaults)
-    if not start_date:
-        start_date = get_default_end_date()
-    if not end_date:
-        end_date = get_default_future_end_date()
+    if not oldest:
+        oldest = get_default_end_date()
+    if not newest:
+        newest = get_default_future_end_date()
 
     # Call the Intervals.icu API
-    params = {"oldest": start_date, "newest": end_date}
+    params = {"oldest": oldest, "newest": newest}
 
     result = await make_intervals_request(
         url=f"/athlete/{athlete_id_to_use}/events", api_key=api_key, params=params
@@ -264,20 +264,20 @@ async def delete_event(
 
 
 async def _fetch_events_for_deletion(
-    athlete_id: str, api_key: str | None, start_date: str, end_date: str
+    athlete_id: str, api_key: str | None, oldest: str, newest: str
 ) -> tuple[list[dict[str, Any]], str | None]:
     """Fetch events for deletion and return them with any error message.
 
     Args:
         athlete_id: The athlete ID.
         api_key: Optional API key.
-        start_date: Start date in YYYY-MM-DD format.
-        end_date: End date in YYYY-MM-DD format.
+        oldest: Oldest date in YYYY-MM-DD format.
+        newest: Newest date in YYYY-MM-DD format.
 
     Returns:
         Tuple of (events_list, error_message). error_message is None if successful.
     """
-    params = {"oldest": validate_date(start_date), "newest": validate_date(end_date)}
+    params = {"oldest": validate_date(oldest), "newest": validate_date(newest)}
     result = await make_intervals_request(
         url=f"/athlete/{athlete_id}/events", api_key=api_key, params=params
     )
@@ -289,16 +289,16 @@ async def _fetch_events_for_deletion(
 
 @mcp.tool()
 async def delete_events_by_date_range(
-    start_date: str,
-    end_date: str,
+    oldest: str,
+    newest: str,
     athlete_id: str | None = None,
     api_key: str | None = None,
 ) -> str:
     """Delete events for an athlete from Intervals.icu in the specified date range.
 
     Args:
-        start_date: Start date in YYYY-MM-DD format
-        end_date: End date in YYYY-MM-DD format
+        oldest: Oldest date in YYYY-MM-DD format
+        newest: Newest date in YYYY-MM-DD format
         athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
     """
@@ -307,7 +307,7 @@ async def delete_events_by_date_range(
         return error_msg
 
     events, error_msg = await _fetch_events_for_deletion(
-        athlete_id_to_use, api_key, start_date, end_date
+        athlete_id_to_use, api_key, oldest, newest
     )
     if error_msg:
         return error_msg
