@@ -50,12 +50,12 @@ def _filter_named_activities(activities: list[dict[str, Any]]) -> list[dict[str,
 
 async def _fetch_more_activities(
     athlete_id: str,
-    start_date: str,
+    oldest: str,
     api_key: str | None,
     api_limit: int,
 ) -> list[dict[str, Any]]:
     """Fetch additional activities from an earlier date range."""
-    oldest_date = datetime.fromisoformat(start_date)
+    oldest_date = datetime.fromisoformat(oldest)
     older_start_date = (oldest_date - timedelta(days=60)).strftime("%Y-%m-%d")
     older_end_date = (oldest_date - timedelta(days=1)).strftime("%Y-%m-%d")
 

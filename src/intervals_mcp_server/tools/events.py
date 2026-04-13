@@ -264,20 +264,20 @@ async def delete_event(
 
 
 async def _fetch_events_for_deletion(
-    athlete_id: str, api_key: str | None, start_date: str, end_date: str
+    athlete_id: str, api_key: str | None, oldest: str, newest: str
 ) -> tuple[list[dict[str, Any]], str | None]:
     """Fetch events for deletion and return them with any error message.
 
     Args:
         athlete_id: The athlete ID.
         api_key: Optional API key.
-        start_date: Start date in YYYY-MM-DD format.
-        end_date: End date in YYYY-MM-DD format.
+        oldest: Oldest date in YYYY-MM-DD format.
+        newest: Newest date in YYYY-MM-DD format.
 
     Returns:
         Tuple of (events_list, error_message). error_message is None if successful.
     """
-    params = {"oldest": validate_date(start_date), "newest": validate_date(end_date)}
+    params = {"oldest": validate_date(oldest), "newest": validate_date(newest)}
     result = await make_intervals_request(
         url=f"/athlete/{athlete_id}/events", api_key=api_key, params=params
     )
