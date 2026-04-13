@@ -268,7 +268,7 @@ def test_get_events(monkeypatch):
 
 
 def test_get_activities_with_oldest_newest(monkeypatch):
-    """Test get_activities works with explicit oldest/newest params."""
+    """Test get_activities forwards oldest/newest as query params."""
     sample = {
         "name": "Morning Ride",
         "id": 123,
@@ -277,8 +277,10 @@ def test_get_activities_with_oldest_newest(monkeypatch):
         "distance": 1000,
         "duration": 3600,
     }
+    captured = {}
 
-    async def fake_request(*_args, **_kwargs):
+    async def fake_request(*_args, **kwargs):
+        captured.update(kwargs.get("params", {}))
         return [sample]
 
     monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
@@ -291,10 +293,12 @@ def test_get_activities_with_oldest_newest(monkeypatch):
         )
     )
     assert "Morning Ride" in result
+    assert captured["oldest"] == "2024-01-01"
+    assert captured["newest"] == "2024-01-02"
 
 
 def test_get_wellness_data_with_oldest_newest(monkeypatch):
-    """Test get_wellness_data works with explicit oldest/newest params."""
+    """Test get_wellness_data forwards oldest/newest as query params."""
     wellness = {
         "2024-01-01": {
             "id": "2024-01-01",
@@ -302,8 +306,10 @@ def test_get_wellness_data_with_oldest_newest(monkeypatch):
             "sleepSecs": 28800,
         }
     }
+    captured = {}
 
-    async def fake_request(*_args, **_kwargs):
+    async def fake_request(*_args, **kwargs):
+        captured.update(kwargs.get("params", {}))
         return wellness
 
     monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
@@ -312,12 +318,16 @@ def test_get_wellness_data_with_oldest_newest(monkeypatch):
         get_wellness_data(athlete_id="i1", oldest="2024-01-01", newest="2024-01-02")
     )
     assert "Wellness Data:" in result
+    assert captured["oldest"] == "2024-01-01"
+    assert captured["newest"] == "2024-01-02"
 
 
 def test_list_seasons_with_oldest_newest(monkeypatch):
-    """Test list_seasons works with explicit oldest/newest params."""
+    """Test list_seasons forwards oldest/newest as query params."""
+    captured = {}
 
-    async def fake_request(*_args, **_kwargs):
+    async def fake_request(*_args, **kwargs):
+        captured.update(kwargs.get("params", {}))
         return SEASON_DATA
 
     monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
@@ -327,22 +337,21 @@ def test_list_seasons_with_oldest_newest(monkeypatch):
         list_seasons(athlete_id="i1", oldest="2024-01-01", newest="2024-01-02")
     )
     assert "Seasons:" in result
+    assert captured["oldest"] == "2024-01-01"
+    assert captured["newest"] == "2024-01-02"
 
 
 def test_delete_events_by_date_range_with_oldest_newest(monkeypatch):
-    """Test delete_events_by_date_range works with explicit oldest/newest params."""
+    """Test delete_events_by_date_range forwards oldest/newest as query params."""
     event = {"id": "e1", "name": "Test Event"}
-    calls = []
+    captured_params = {}
 
-    async def fake_request(*args, **kwargs):
-        calls.append(kwargs.get("url", args[0] if args else ""))
-        if "events" in str(kwargs.get("url", args[0] if args else "")):
-            if kwargs.get("method") == "DELETE" or "events/e1" in str(
-                kwargs.get("url", args[0] if args else "")
-            ):
-                return {}
-            return [event]
-        return {}
+    async def fake_request(*_args, **kwargs):
+        if kwargs.get("params"):
+            captured_params.update(kwargs["params"])
+        if kwargs.get("method") == "DELETE":
+            return {}
+        return [event]
 
     monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
     monkeypatch.setattr("intervals_mcp_server.tools.events.make_intervals_request", fake_request)
@@ -350,6 +359,8 @@ def test_delete_events_by_date_range_with_oldest_newest(monkeypatch):
         delete_events_by_date_range(athlete_id="i1", oldest="2024-01-01", newest="2024-01-02")
     )
     assert "Deleted" in result
+    assert captured_params["oldest"] == "2024-01-01"
+    assert captured_params["newest"] == "2024-01-02"
 
 
 def test_get_event_by_id(monkeypatch):
