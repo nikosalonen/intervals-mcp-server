@@ -23,6 +23,7 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     create_bulk_events,
     create_bulk_workouts,
     create_season,
+    delete_events_by_date_range,
     get_activities,
     get_activity_details,
     get_activity_intervals,
