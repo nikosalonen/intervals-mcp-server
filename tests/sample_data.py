@@ -4,6 +4,35 @@ Sample data for testing Intervals.icu MCP server functions.
 This module contains test data structures used across the test suite.
 """
 
+GEAR_DATA = [
+    {
+        "id": "b12345",
+        "type": "Bike",
+        "name": "Canyon Ultimate",
+        "distance": 1523000.0,
+        "activities": 87,
+        "retired": False,
+        "default_for_type": "Ride",
+    },
+    {
+        "id": "s67890",
+        "component_type": "Shoes",
+        "name": "Old Pegasus",
+        "distance": 800000.0,
+        "activity_count": 120,
+        "retired": True,
+    },
+]
+
+ACTIVITY_WITH_GEAR_DATA = {
+    "id": "act1",
+    "name": "Morning Ride",
+    "type": "Ride",
+    "startTime": "2024-06-01T08:00:00Z",
+    "distance": 40000,
+    "gear_id": "b12345",
+}
+
 ATHLETE_DATA = {
     "id": "i1",
     "name": "Test Athlete",

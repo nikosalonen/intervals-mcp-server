@@ -15,6 +15,7 @@ from intervals_mcp_server.utils.formatting import (
     format_event_details,
     format_event_summary,
     format_folder_summary,
+    format_gear_list,
     format_intervals,
     format_search_result,
     format_sport_settings,
@@ -29,6 +30,7 @@ from intervals_mcp_server.utils.schemas import (
     CustomItem,
     EventResponse,
     Folder,
+    Gear,
     IntervalsData,
     WellnessEntry,
     Workout,
@@ -59,6 +61,32 @@ def test_format_activity_summary_calories_burned_label():
     result = format_activity_summary(Activity.from_dict(data))
     assert "Calories burned: 850 kcal" in result
     assert "Calories: 850\n" not in result
+
+
+def test_format_activity_summary_gear():
+    """Activity summary shows gear as 'Name (id)', bare id, or N/A."""
+    with_name = Activity.from_dict({"id": 1, "gear": {"id": "b1", "name": "Racer"}})
+    assert "Gear: Racer (b1)" in format_activity_summary(with_name)
+
+    id_only = Activity.from_dict({"id": 2, "gear_id": "b1"})
+    assert "Gear: b1" in format_activity_summary(id_only)
+
+    no_gear = Activity.from_dict({"id": 3})
+    assert "Gear: N/A" in format_activity_summary(no_gear)
+
+
+def test_format_gear_list():
+    """format_gear_list renders one block per gear item."""
+    items = [
+        Gear(id="b1", type="Bike", name="Racer", distance=1500000.0, activity_count=80),
+        Gear(id="s1", type="Shoes", name="Trainers", retired=True),
+    ]
+    result = format_gear_list(items)
+    assert "Name: Racer" in result
+    assert "Distance: 1500.0 km" in result
+    assert "Activities: 80" in result
+    assert "Name: Trainers" in result
+    assert "Retired: yes" in result
 
 
 def test_format_wellness_entry_macros_populated():

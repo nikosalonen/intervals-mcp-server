@@ -265,6 +265,8 @@ class Activity:
     device_name: str | None = None
     power_meter: str | None = None
     file_type: str | None = None
+    gear_id: str | None = None
+    gear_name: str | None = None
     tags: list[str] = field(default_factory=list)
 
     @classmethod
@@ -273,6 +275,9 @@ class Activity:
 
         Maps select camelCase API aliases (e.g., startTime, avgHr, avgPower) to snake_case fields.
         """
+        # Gear may arrive as a nested object ({"id": ..., "name": ...}) or a bare gear_id.
+        gear = data.get("gear")
+        gear_dict = gear if isinstance(gear, dict) else {}
         return cls(
             id=data.get("id"),
             name=data.get("name"),
@@ -338,6 +343,8 @@ class Activity:
             device_name=data.get("device_name"),
             power_meter=data.get("power_meter"),
             file_type=data.get("file_type"),
+            gear_id=_first(data.get("gear_id"), gear_dict.get("id")),
+            gear_name=_first(gear_dict.get("name"), gear_dict.get("display_name")),
             tags=_normalize_tags(data.get("tags")),
         )
 
@@ -703,6 +710,32 @@ class Athlete:
             location=data.get("location") or data.get("city"),
             timezone=data.get("timezone"),
             status=_safe_enum(AthleteStatus, data.get("status")),
+        )
+
+
+@dataclass(frozen=True)
+class Gear:
+    """A gear item (bike, shoes, etc.) from /athlete/{id}/gear."""
+
+    id: str | None = None
+    type: str | None = None
+    name: str | None = None
+    distance: float | None = None  # meters
+    activity_count: int | None = None
+    retired: bool | None = None
+    default_for_type: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Gear":
+        """Create a Gear from a raw API response dict."""
+        return cls(
+            id=data.get("id"),
+            type=_first(data.get("component_type"), data.get("type")),
+            name=_first(data.get("name"), data.get("display_name")),
+            distance=data.get("distance"),
+            activity_count=_first(data.get("activities"), data.get("activity_count")),
+            retired=data.get("retired"),
+            default_for_type=_first(data.get("default_for_type"), data.get("default_for")),
         )
 
 

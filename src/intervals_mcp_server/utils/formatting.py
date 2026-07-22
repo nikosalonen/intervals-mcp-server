@@ -19,6 +19,7 @@ from intervals_mcp_server.utils.schemas import (
     EventResponse,
     EventWorkout,
     Folder,
+    Gear,
     IntervalsData,
     WellnessEntry,
     Workout,
@@ -45,6 +46,17 @@ def _fmt_datetime(value: str | None) -> str:
         except ValueError:
             logger.warning("Failed to parse datetime: %s", value)
     return value
+
+
+def _fmt_gear(activity: Activity) -> str:
+    """Format an activity's gear as 'Name (id)', bare id, or N/A."""
+    if activity.gear_name and activity.gear_id:
+        return f"{activity.gear_name} ({activity.gear_id})"
+    if activity.gear_name:
+        return activity.gear_name
+    if activity.gear_id:
+        return activity.gear_id
+    return "N/A"
 
 
 def format_activity_summary(activity: Activity) -> str:
@@ -127,6 +139,7 @@ Device Info:
 Device: {_fmt(activity.device_name)}
 Power Meter: {_fmt(activity.power_meter)}
 File Type: {_fmt(activity.file_type)}
+Gear: {_fmt_gear(activity)}
 """
 
 
@@ -492,6 +505,25 @@ Resting HR: {_fmt(athlete.icu_resting_hr)} bpm
 Location: {_fmt(athlete.location)}
 Timezone: {_fmt(athlete.timezone)}
 Status: {_fmt(athlete.status)}"""
+
+
+def format_gear_list(gear_items: list[Gear]) -> str:
+    """Format the gear catalog into a readable listing."""
+    lines = ["Gear:"]
+    for item in gear_items:
+        lines.append("")
+        lines.append(f"Name: {_fmt(item.name)}")
+        lines.append(f"ID: {_fmt(item.id)}")
+        lines.append(f"Type: {_fmt(item.type)}")
+        if item.distance is not None:
+            lines.append(f"Distance: {item.distance / 1000:.1f} km")
+        if item.activity_count is not None:
+            lines.append(f"Activities: {item.activity_count}")
+        if item.default_for_type:
+            lines.append(f"Default for: {item.default_for_type}")
+        if item.retired:
+            lines.append("Retired: yes")
+    return "\n".join(lines)
 
 
 def format_sport_settings(setting: AthleteSportSettings) -> str:

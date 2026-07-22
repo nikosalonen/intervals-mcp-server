@@ -165,6 +165,7 @@ Once the server is running and Claude Desktop is configured, you can use the fol
 - `get_wellness_data`: Fetch wellness data
 - `get_events`: Retrieve upcoming events (workouts, races, etc.)
 - `get_event_by_id`: Get detailed information for a specific event
+- `get_gear_list`: List the gear catalog (bikes, shoes, etc.); gear names are also resolved in activity output
 
 ## Usage with ChatGPT
 

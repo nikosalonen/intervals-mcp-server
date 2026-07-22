@@ -20,6 +20,7 @@ from intervals_mcp_server.utils.schemas import (
     EventResponse,
     EventWorkout,
     Folder,
+    Gear,
     IntervalsData,
     WellnessEntry,
     WellnessSportInfo,
@@ -196,6 +197,46 @@ def test_wellness_entry_macros_default_none():
     assert entry.carbohydrates is None
     assert entry.protein is None
     assert entry.fat_total is None
+
+
+# ── Gear ──────────────────────────────────────────────────────────────────
+
+
+def test_gear_from_dict():
+    """Gear.from_dict() maps fields including component_type/activity_count aliases."""
+    gear = Gear.from_dict(
+        {
+            "id": "b1",
+            "component_type": "Bike",
+            "name": "Racer",
+            "distance": 5000.0,
+            "activity_count": 12,
+            "retired": True,
+            "default_for": "Ride",
+        }
+    )
+    assert gear.id == "b1"
+    assert gear.type == "Bike"
+    assert gear.name == "Racer"
+    assert gear.distance == 5000.0
+    assert gear.activity_count == 12
+    assert gear.retired is True
+    assert gear.default_for_type == "Ride"
+
+
+def test_activity_from_dict_gear_id_shapes():
+    """Activity.from_dict() extracts gear info from both gear_id and nested gear object."""
+    from_bare = Activity.from_dict({"id": "a1", "gear_id": "b1"})
+    assert from_bare.gear_id == "b1"
+    assert from_bare.gear_name is None
+
+    from_nested = Activity.from_dict({"id": "a2", "gear": {"id": "b2", "name": "Racer"}})
+    assert from_nested.gear_id == "b2"
+    assert from_nested.gear_name == "Racer"
+
+    without_gear = Activity.from_dict({"id": "a3"})
+    assert without_gear.gear_id is None
+    assert without_gear.gear_name is None
 
 
 # ── Athlete ───────────────────────────────────────────────────────────────

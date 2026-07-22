@@ -31,6 +31,7 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     get_activity_streams,
     get_athlete,
     get_event_by_id,
+    get_gear_list,
     get_training_plan,
     get_events,
     get_sport_settings,
@@ -49,9 +50,11 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     update_sport_settings,
 )
 from tests.sample_data import (  # pylint: disable=wrong-import-position
+    ACTIVITY_WITH_GEAR_DATA,
     ATHLETE_DATA,
     BULK_WORKOUT_RESPONSE,
     FOLDER_DATA,
+    GEAR_DATA,
     INTERVALS_DATA,
     SEARCH_RESULTS_DATA,
     SEASON_DATA,
@@ -1996,3 +1999,118 @@ def test_update_sport_settings_unexpected_response(monkeypatch):
     assert "unexpected response" in result
 
 
+
+
+# ── Gear ──────────────────────────────────────────────────────────────────
+
+
+def _clear_gear_cache(monkeypatch):
+    """Reset the module-level gear cache so tests don't leak state."""
+    monkeypatch.setattr("intervals_mcp_server.tools.gear._gear_cache", {})
+
+
+def test_get_gear_list(monkeypatch):
+    """get_gear_list renders the gear catalog with names, distance and markers."""
+    _clear_gear_cache(monkeypatch)
+
+    async def fake_request(*_args, **_kwargs):
+        return GEAR_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    result = asyncio.run(get_gear_list(athlete_id="i1"))
+    assert "Canyon Ultimate" in result
+    assert "ID: b12345" in result
+    assert "Distance: 1523.0 km" in result
+    assert "Default for: Ride" in result
+    assert "Old Pegasus" in result
+    assert "Type: Shoes" in result  # component_type alias
+    assert "Activities: 120" in result  # activity_count alias
+    assert "Retired: yes" in result
+
+
+def test_get_gear_list_empty(monkeypatch):
+    """get_gear_list reports when the athlete has no gear."""
+    _clear_gear_cache(monkeypatch)
+
+    async def fake_request(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    result = asyncio.run(get_gear_list(athlete_id="i1"))
+    assert "No gear found" in result
+
+
+def test_get_gear_list_cache_and_refresh(monkeypatch):
+    """The gear catalog is cached; refresh=True re-fetches."""
+    _clear_gear_cache(monkeypatch)
+    calls = {"count": 0}
+
+    async def fake_request(*_args, **_kwargs):
+        calls["count"] += 1
+        return GEAR_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    asyncio.run(get_gear_list(athlete_id="i1"))
+    asyncio.run(get_gear_list(athlete_id="i1"))
+    assert calls["count"] == 1  # second call served from cache
+
+    asyncio.run(get_gear_list(athlete_id="i1", refresh=True))
+    assert calls["count"] == 2
+
+
+def test_get_activities_resolves_gear_name(monkeypatch):
+    """get_activities resolves gear IDs to names via the gear catalog."""
+    _clear_gear_cache(monkeypatch)
+
+    async def fake_request(*_args, **kwargs):
+        if "/gear" in kwargs.get("url", ""):
+            return GEAR_DATA
+        return [ACTIVITY_WITH_GEAR_DATA]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.activities.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    result = asyncio.run(get_activities(athlete_id="i1", limit=1, include_unnamed=True))
+    assert "Gear: Canyon Ultimate (b12345)" in result
+
+
+def test_get_activity_details_resolves_gear_name(monkeypatch):
+    """get_activity_details resolves the gear ID to a name via the gear catalog."""
+    _clear_gear_cache(monkeypatch)
+
+    async def fake_request(*_args, **kwargs):
+        if "/gear" in kwargs.get("url", ""):
+            return GEAR_DATA
+        return ACTIVITY_WITH_GEAR_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.activities.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    result = asyncio.run(get_activity_details("act1"))
+    assert "Gear: Canyon Ultimate (b12345)" in result
+
+
+def test_get_activity_details_gear_lookup_failure_degrades(monkeypatch):
+    """A failed gear lookup leaves the bare gear ID instead of failing the tool."""
+    _clear_gear_cache(monkeypatch)
+
+    async def fake_request(*_args, **kwargs):
+        if "/gear" in kwargs.get("url", ""):
+            return {"error": True, "message": "boom"}
+        return ACTIVITY_WITH_GEAR_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.activities.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    result = asyncio.run(get_activity_details("act1"))
+    assert "Morning Ride" in result
+    assert "Gear: b12345" in result
