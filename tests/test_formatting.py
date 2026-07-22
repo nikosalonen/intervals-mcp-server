@@ -129,6 +129,29 @@ def test_format_power_curves():
     assert "No data available for requested durations." in empty
 
 
+def test_format_power_curves_divergent_wkg_activity():
+    """When the W/kg peak comes from a different activity, both IDs are shown."""
+    curve = PowerCurve(
+        id="s0",
+        label="This season",
+        secs=[5, 60],
+        values=[890, 480],
+        activity_id=["a1", "a2"],
+        watts_per_kg=[11.87, 6.4],
+        wkg_activity_id=["a9", "a2"],
+    )
+    result = format_power_curves([curve], [5, 60], include_normalised=True)
+    assert "5s: 890W 11.87W/kg [a1] (W/kg: [a9])" in result
+    # Matching IDs render only the single power activity tag
+    assert "1m: 480W 6.40W/kg [a2]" in result
+    assert "1m: 480W 6.40W/kg [a2] (W/kg:" not in result
+
+    # Without normalised output the wkg activity id is irrelevant
+    plain = format_power_curves([curve], [5], include_normalised=False)
+    assert "5s: 890W [a1]" in plain
+    assert "W/kg" not in plain
+
+
 def test_format_wellness_entry_macros_populated():
     """Nutrition macros render with gram suffixes when present."""
     entry = WellnessEntry(

@@ -562,8 +562,14 @@ def format_power_curves(
             parts = [f"  {_fmt_curve_duration(duration)}: {curve.values[idx]}W"]
             if include_normalised and idx < len(curve.watts_per_kg):
                 parts.append(f"{curve.watts_per_kg[idx]:.2f}W/kg")
-            if idx < len(curve.activity_id) and curve.activity_id[idx]:
-                parts.append(f"[{curve.activity_id[idx]}]")
+            power_aid = curve.activity_id[idx] if idx < len(curve.activity_id) else None
+            if power_aid:
+                parts.append(f"[{power_aid}]")
+            # The W/kg peak can be set in a different activity than the watts peak
+            if include_normalised and idx < len(curve.wkg_activity_id):
+                wkg_aid = curve.wkg_activity_id[idx]
+                if wkg_aid and wkg_aid != power_aid:
+                    parts.append(f"(W/kg: [{wkg_aid}])")
             data_lines.append(" ".join(parts))
 
         if data_lines:
