@@ -92,6 +92,13 @@ class ValueUnits(Enum):
     WATTS = "w"
     PERCENT_FTP = "%ftp"
     CADENCE = "cadence"
+    MINS_KM = "MINS_KM"
+    MINS_MILE = "MINS_MILE"
+    SECS_100M = "SECS_100M"
+    SECS_100Y = "SECS_100Y"
+    SECS_500M = "SECS_500M"
+    SECS_400M = "SECS_400M"
+    SECS_250M = "SECS_250M"
 
 
 class TransportAliases(StrEnum):
@@ -191,6 +198,13 @@ class Value:
             ValueUnits.PERCENT_FTP: "ftp",
             ValueUnits.POWER_ZONE: "W",
             ValueUnits.CADENCE: "Cadence",
+            ValueUnits.MINS_KM: "min/km",
+            ValueUnits.MINS_MILE: "min/mi",
+            ValueUnits.SECS_100M: "s/100m",
+            ValueUnits.SECS_100Y: "s/100y",
+            ValueUnits.SECS_500M: "s/500m",
+            ValueUnits.SECS_400M: "s/400m",
+            ValueUnits.SECS_250M: "s/250m",
         }
         if self.units is None:
             return ""
