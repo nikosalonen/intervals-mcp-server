@@ -5,11 +5,13 @@ This module contains tools for retrieving and managing athlete activities.
 """
 
 import logging
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any
 
 from intervals_mcp_server.api.client import make_intervals_request
 from intervals_mcp_server.config import get_config
+from intervals_mcp_server.tools.gear import get_gear_name_map
 from intervals_mcp_server.utils.formatting import format_activity_message, format_activity_summary, format_intervals
 from intervals_mcp_server.utils.schemas import Activity, ActivityMessage, IntervalsData
 from intervals_mcp_server.utils.validation import resolve_athlete_id, resolve_date_params
@@ -78,10 +80,20 @@ async def _fetch_more_activities(
     return []
 
 
+def _resolve_gear_name(activity: Activity, gear_map: dict[str, str]) -> Activity:
+    """Fill in gear_name from the gear map when the payload only had an ID."""
+    if activity.gear_id and not activity.gear_name:
+        name = gear_map.get(activity.gear_id)
+        if name:
+            return replace(activity, gear_name=name)
+    return activity
+
+
 def _format_activities_response(
     activities: list[dict[str, Any]],
     athlete_id: str,
     include_unnamed: bool,
+    gear_map: dict[str, str] | None = None,
 ) -> str:
     """Format the activities response based on the results."""
     if not activities:
@@ -95,7 +107,10 @@ def _format_activities_response(
     for activity in activities:
         if isinstance(activity, dict):
             try:
-                activities_summary += format_activity_summary(Activity.from_dict(activity)) + "\n"
+                parsed = Activity.from_dict(activity)
+                if gear_map:
+                    parsed = _resolve_gear_name(parsed, gear_map)
+                activities_summary += format_activity_summary(parsed) + "\n"
             except (TypeError, KeyError, ValueError) as e:
                 aid = activity.get("id", "unknown")
                 logger.error("Failed to format activity %s: %s", aid, e, exc_info=True)
@@ -171,7 +186,12 @@ async def get_activities(  # pylint: disable=too-many-arguments,too-many-return-
     # Limit to requested count
     activities = activities[:limit]
 
-    return _format_activities_response(activities, athlete_id_to_use, include_unnamed)
+    # Resolve gear names (one cached catalog fetch) only when some activity has gear info
+    gear_map: dict[str, str] | None = None
+    if any(isinstance(a, dict) and (a.get("gear") or a.get("gear_id")) for a in activities):
+        gear_map = await get_gear_name_map(athlete_id_to_use, api_key=api_key)
+
+    return _format_activities_response(activities, athlete_id_to_use, include_unnamed, gear_map)
 
 
 @mcp.tool()
@@ -234,10 +254,18 @@ async def get_activity_details(activity_id: str, api_key: str | None = None) -> 
 
     # Return a more detailed view of the activity
     try:
-        detailed_view = format_activity_summary(Activity.from_dict(activity_data))
+        parsed_activity = Activity.from_dict(activity_data)
     except (TypeError, KeyError, ValueError) as e:
         logger.error("Failed to parse activity %s: %s", activity_id, e, exc_info=True)
         return f"Error: Failed to parse activity data for {activity_id}."
+
+    # Resolve the gear name (uses the configured athlete, matching the
+    # paired-event enrichment above; degrades to the bare gear ID on failure)
+    if parsed_activity.gear_id and not parsed_activity.gear_name:
+        gear_map = await get_gear_name_map(config.athlete_id, api_key=api_key)
+        parsed_activity = _resolve_gear_name(parsed_activity, gear_map)
+
+    detailed_view = format_activity_summary(parsed_activity)
 
     # Add additional details if available
     if "zones" in activity_data:

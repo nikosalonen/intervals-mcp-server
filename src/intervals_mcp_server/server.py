@@ -43,6 +43,8 @@ Usage:
         - get_sport_settings
         - update_sport_settings
         - get_training_plan
+        - get_gear_list
+        - get_athlete_power_curves
         - search_activities
         - search_intervals
         - list_workouts
@@ -126,6 +128,8 @@ from intervals_mcp_server.tools.seasons import (  # pylint: disable=wrong-import
     list_seasons,
     update_season,
 )
+from intervals_mcp_server.tools.gear import get_gear_list  # pylint: disable=wrong-import-position  # noqa: E402
+from intervals_mcp_server.tools.power_curves import get_athlete_power_curves  # pylint: disable=wrong-import-position  # noqa: E402
 
 # Re-export make_intervals_request and httpx_client for backward compatibility
 # pylint: disable=duplicate-code  # This __all__ list is intentionally similar to tools/__init__.py
@@ -154,6 +158,8 @@ __all__ = [
     "get_sport_settings",
     "get_training_plan",
     "update_sport_settings",
+    "get_gear_list",
+    "get_athlete_power_curves",
     "search_activities",
     "search_intervals",
     "list_workouts",

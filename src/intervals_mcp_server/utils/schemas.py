@@ -265,6 +265,8 @@ class Activity:
     device_name: str | None = None
     power_meter: str | None = None
     file_type: str | None = None
+    gear_id: str | None = None
+    gear_name: str | None = None
     tags: list[str] = field(default_factory=list)
 
     @classmethod
@@ -273,6 +275,9 @@ class Activity:
 
         Maps select camelCase API aliases (e.g., startTime, avgHr, avgPower) to snake_case fields.
         """
+        # Gear may arrive as a nested object ({"id": ..., "name": ...}) or a bare gear_id.
+        gear = data.get("gear")
+        gear_dict = gear if isinstance(gear, dict) else {}
         return cls(
             id=data.get("id"),
             name=data.get("name"),
@@ -338,6 +343,8 @@ class Activity:
             device_name=data.get("device_name"),
             power_meter=data.get("power_meter"),
             file_type=data.get("file_type"),
+            gear_id=_first(data.get("gear_id"), gear_dict.get("id")),
+            gear_name=_first(gear_dict.get("name"), gear_dict.get("display_name")),
             tags=_normalize_tags(data.get("tags")),
         )
 
@@ -591,6 +598,9 @@ class WellnessEntry:
     menstrual_phase: str | None = None
     menstrual_phase_predicted: str | None = None
     kcal_consumed: int | None = None
+    carbohydrates: float | None = None  # grams
+    protein: float | None = None  # grams
+    fat_total: float | None = None  # grams
     sleep_secs: int | None = None
     sleep_score: float | None = None
     sleep_quality: int | None = None
@@ -640,6 +650,9 @@ class WellnessEntry:
             menstrual_phase=_safe_enum(MenstrualPhase, data.get("menstrualPhase")),
             menstrual_phase_predicted=_safe_enum(MenstrualPhase, data.get("menstrualPhasePredicted")),
             kcal_consumed=data.get("kcalConsumed"),
+            carbohydrates=data.get("carbohydrates"),
+            protein=data.get("protein"),
+            fat_total=data.get("fatTotal"),
             sleep_secs=data.get("sleepSecs"),
             sleep_score=data.get("sleepScore"),
             sleep_quality=data.get("sleepQuality"),
@@ -697,6 +710,68 @@ class Athlete:
             location=data.get("location") or data.get("city"),
             timezone=data.get("timezone"),
             status=_safe_enum(AthleteStatus, data.get("status")),
+        )
+
+
+@dataclass(frozen=True)
+class Gear:
+    """A gear item (bike, shoes, etc.) from /athlete/{id}/gear."""
+
+    id: str | None = None
+    type: str | None = None
+    name: str | None = None
+    distance: float | None = None  # meters
+    activity_count: int | None = None
+    retired: bool | None = None
+    default_for_type: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Gear":
+        """Create a Gear from a raw API response dict."""
+        return cls(
+            id=data.get("id"),
+            # Components carry component_type (chain, cassette, ...); prefer it
+            # over the generic type ("Bike") when both are present
+            type=_first(data.get("component_type"), data.get("type")),
+            name=_first(data.get("name"), data.get("display_name")),
+            distance=data.get("distance"),
+            activity_count=_first(data.get("activities"), data.get("activity_count")),
+            retired=data.get("retired"),
+            default_for_type=_first(data.get("default_for_type"), data.get("default_for")),
+        )
+
+
+@dataclass(frozen=True)
+class PowerCurve:
+    """A power curve from /athlete/{id}/power-curves.
+
+    The API returns parallel arrays: values[i] is the best power for secs[i],
+    set in the activity activity_id[i] (and likewise for the W/kg arrays).
+    """
+
+    id: str | None = None
+    label: str | None = None
+    start_date_local: str | None = None
+    end_date_local: str | None = None
+    secs: list[int] = field(default_factory=list)
+    values: list[float] = field(default_factory=list)
+    activity_id: list[str] = field(default_factory=list)
+    watts_per_kg: list[float] = field(default_factory=list)
+    wkg_activity_id: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "PowerCurve":
+        """Create a PowerCurve from a raw API response dict."""
+        return cls(
+            id=data.get("id"),
+            label=_first(data.get("label"), data.get("id")),
+            start_date_local=data.get("start_date_local"),
+            end_date_local=data.get("end_date_local"),
+            secs=_get_list(data, "secs"),
+            values=_get_list(data, "values"),
+            activity_id=_get_list(data, "activity_id"),
+            watts_per_kg=_get_list(data, "watts_per_kg"),
+            wkg_activity_id=_get_list(data, "wkg_activity_id"),
         )
 
 

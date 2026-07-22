@@ -19,7 +19,9 @@ from intervals_mcp_server.utils.schemas import (
     EventResponse,
     EventWorkout,
     Folder,
+    Gear,
     IntervalsData,
+    PowerCurve,
     WellnessEntry,
     Workout,
 )
@@ -45,6 +47,17 @@ def _fmt_datetime(value: str | None) -> str:
         except ValueError:
             logger.warning("Failed to parse datetime: %s", value)
     return value
+
+
+def _fmt_gear(activity: Activity) -> str:
+    """Format an activity's gear as 'Name (id)', bare name, bare id, or N/A."""
+    if activity.gear_name and activity.gear_id:
+        return f"{activity.gear_name} ({activity.gear_id})"
+    if activity.gear_name:
+        return activity.gear_name
+    if activity.gear_id:
+        return activity.gear_id
+    return "N/A"
 
 
 def format_activity_summary(activity: Activity) -> str:
@@ -94,7 +107,7 @@ Decoupling: {_fmt(activity.decoupling)}
 
 Other Metrics:
 Cadence: {_fmt(activity.average_cadence)} rpm
-Calories: {_fmt(activity.calories)}
+Calories burned: {_fmt(activity.calories)} kcal
 Average Speed: {_fmt(activity.average_speed)} m/s
 Max Speed: {_fmt(activity.max_speed)} m/s
 Average Stride: {_fmt(activity.average_stride)}
@@ -127,6 +140,7 @@ Device Info:
 Device: {_fmt(activity.device_name)}
 Power Meter: {_fmt(activity.power_meter)}
 File Type: {_fmt(activity.file_type)}
+Gear: {_fmt_gear(activity)}
 """
 
 
@@ -286,12 +300,15 @@ def _format_subjective_feelings(entry: WellnessEntry) -> list[str]:
 def _format_nutrition_hydration(entry: WellnessEntry) -> list[str]:
     """Format nutrition and hydration section."""
     nutrition_lines = []
-    for value, label in [
-        (entry.kcal_consumed, "Calories Consumed"),
-        (entry.hydration_volume, "Hydration Volume"),
+    for value, label, suffix in [
+        (entry.kcal_consumed, "Calories Consumed", ""),
+        (entry.carbohydrates, "Carbohydrates", " g"),
+        (entry.protein, "Protein", " g"),
+        (entry.fat_total, "Fat", " g"),
+        (entry.hydration_volume, "Hydration Volume", ""),
     ]:
         if value is not None:
-            nutrition_lines.append(f"- {label}: {value}")
+            nutrition_lines.append(f"- {label}: {value}{suffix}")
 
     if entry.hydration is not None:
         nutrition_lines.append(f"  Hydration Score: {entry.hydration}/10")
@@ -489,6 +506,85 @@ Resting HR: {_fmt(athlete.icu_resting_hr)} bpm
 Location: {_fmt(athlete.location)}
 Timezone: {_fmt(athlete.timezone)}
 Status: {_fmt(athlete.status)}"""
+
+
+def format_gear_list(gear_items: list[Gear]) -> str:
+    """Format the gear catalog into a readable listing."""
+    lines = ["Gear:"]
+    for item in gear_items:
+        lines.append("")
+        lines.append(f"Name: {_fmt(item.name)}")
+        lines.append(f"ID: {_fmt(item.id)}")
+        lines.append(f"Type: {_fmt(item.type)}")
+        if isinstance(item.distance, (int, float)):
+            lines.append(f"Distance: {item.distance / 1000:.1f} km")
+        if item.activity_count is not None:
+            lines.append(f"Activities: {item.activity_count}")
+        if item.default_for_type:
+            lines.append(f"Default for: {item.default_for_type}")
+        if item.retired:
+            lines.append("Retired: yes")
+    return "\n".join(lines)
+
+
+def _fmt_curve_duration(secs: int) -> str:
+    """Format seconds into a concise duration label (5s, 2m, 1h30m)."""
+    if secs < 60:
+        return f"{secs}s"
+    if secs < 3600:
+        mins, rem = divmod(secs, 60)
+        return f"{mins}m{rem}s" if rem else f"{mins}m"
+    hours, rem = divmod(secs, 3600)
+    mins = rem // 60
+    return f"{hours}h{mins}m" if mins else f"{hours}h"
+
+
+def format_power_curves(
+    curves: list[PowerCurve],
+    durations: list[int],
+    include_normalised: bool,
+) -> str:
+    """Format power curves into a readable string, one section per curve."""
+    lines = ["Power Curves:"]
+    for curve in curves:
+        date_range = ""
+        if curve.start_date_local and curve.end_date_local:
+            date_range = f" ({curve.start_date_local[:10]} to {curve.end_date_local[:10]})"
+        lines.append("")
+        lines.append(f"{_fmt(curve.label)}{date_range}:")
+
+        sec_to_idx = {s: i for i, s in enumerate(curve.secs)}
+        data_lines = []
+        missing = []
+        for duration in durations:
+            idx = sec_to_idx.get(duration)
+            # The API omits durations it has no sample for, and may return null
+            # elements inside the parallel arrays; both count as missing data.
+            watts = curve.values[idx] if idx is not None and idx < len(curve.values) else None
+            if idx is None or watts is None:
+                missing.append(_fmt_curve_duration(duration))
+                continue
+            parts = [f"  {_fmt_curve_duration(duration)}: {watts}W"]
+            wkg = curve.watts_per_kg[idx] if idx < len(curve.watts_per_kg) else None
+            if include_normalised and isinstance(wkg, (int, float)):
+                parts.append(f"{wkg:.2f}W/kg")
+            power_aid = curve.activity_id[idx] if idx < len(curve.activity_id) else None
+            if power_aid:
+                parts.append(f"[{power_aid}]")
+            # The W/kg peak can be set in a different activity than the watts peak
+            if include_normalised and idx < len(curve.wkg_activity_id):
+                wkg_aid = curve.wkg_activity_id[idx]
+                if wkg_aid and wkg_aid != power_aid:
+                    parts.append(f"(W/kg: [{wkg_aid}])")
+            data_lines.append(" ".join(parts))
+
+        if data_lines:
+            lines.extend(data_lines)
+            if missing:
+                lines.append(f"  No data for: {', '.join(missing)}")
+        else:
+            lines.append("  No data available for requested durations.")
+    return "\n".join(lines)
 
 
 def format_sport_settings(setting: AthleteSportSettings) -> str:

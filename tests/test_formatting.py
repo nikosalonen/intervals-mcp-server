@@ -14,8 +14,11 @@ from intervals_mcp_server.utils.formatting import (
     format_custom_item_details,
     format_event_details,
     format_event_summary,
+    _fmt_curve_duration,
     format_folder_summary,
+    format_gear_list,
     format_intervals,
+    format_power_curves,
     format_search_result,
     format_sport_settings,
     format_wellness_entry,
@@ -29,7 +32,9 @@ from intervals_mcp_server.utils.schemas import (
     CustomItem,
     EventResponse,
     Folder,
+    Gear,
     IntervalsData,
+    PowerCurve,
     WellnessEntry,
     Workout,
 )
@@ -51,6 +56,199 @@ def test_format_activity_summary():
     result = format_activity_summary(Activity.from_dict(data))
     assert "Activity: Morning Ride" in result
     assert "ID: 1" in result
+
+
+def test_format_activity_summary_calories_burned_label():
+    """Activity calories are labeled 'Calories burned' with a kcal unit."""
+    data = {"name": "Ride", "id": 2, "calories": 850}
+    result = format_activity_summary(Activity.from_dict(data))
+    assert "Calories burned: 850 kcal" in result
+    assert "Calories: 850\n" not in result
+
+
+def test_format_activity_summary_gear():
+    """Activity summary shows gear as 'Name (id)', bare id, or N/A."""
+    with_name = Activity.from_dict({"id": 1, "gear": {"id": "b1", "name": "Racer"}})
+    assert "Gear: Racer (b1)" in format_activity_summary(with_name)
+
+    id_only = Activity.from_dict({"id": 2, "gear_id": "b1"})
+    assert "Gear: b1" in format_activity_summary(id_only)
+
+    no_gear = Activity.from_dict({"id": 3})
+    assert "Gear: N/A" in format_activity_summary(no_gear)
+
+
+def test_format_gear_list():
+    """format_gear_list renders one block per gear item."""
+    items = [
+        Gear(id="b1", type="Bike", name="Racer", distance=1500000.0, activity_count=80),
+        Gear(id="s1", type="Shoes", name="Trainers", retired=True),
+    ]
+    result = format_gear_list(items)
+    assert "Name: Racer" in result
+    assert "Distance: 1500.0 km" in result
+    assert "Activities: 80" in result
+    assert "Name: Trainers" in result
+    assert "Retired: yes" in result
+
+
+def test_fmt_curve_duration():
+    """Durations humanize as 5s / 2m / 2m30s / 20m / 1h / 1h30m."""
+    assert _fmt_curve_duration(5) == "5s"
+    assert _fmt_curve_duration(120) == "2m"
+    assert _fmt_curve_duration(150) == "2m30s"
+    assert _fmt_curve_duration(1200) == "20m"
+    assert _fmt_curve_duration(3600) == "1h"
+    assert _fmt_curve_duration(5400) == "1h30m"
+
+
+def test_format_power_curves():
+    """format_power_curves renders per-curve sections with watts, W/kg and activity IDs."""
+    curve = PowerCurve(
+        id="s0",
+        label="This season",
+        start_date_local="2024-01-01T00:00:00",
+        end_date_local="2024-06-01T00:00:00",
+        secs=[5, 60],
+        values=[890, 480],
+        activity_id=["a1", "a2"],
+        watts_per_kg=[11.87, 6.4],
+        wkg_activity_id=["a1", "a2"],
+    )
+    result = format_power_curves([curve], [5, 60, 3600], include_normalised=True)
+    assert "This season (2024-01-01 to 2024-06-01):" in result
+    assert "5s: 890W 11.87W/kg [a1]" in result
+    assert "1m: 480W 6.40W/kg [a2]" in result
+    assert "1h:" not in result  # not present in the curve — skipped
+    assert "No data for: 1h" in result  # ... but its absence is called out
+
+    plain = format_power_curves([curve], [5], include_normalised=False)
+    assert "5s: 890W [a1]" in plain
+    assert "W/kg" not in plain
+
+    empty = format_power_curves([PowerCurve(id="s1", label="Last season")], [5], True)
+    assert "No data available for requested durations." in empty
+
+
+def test_format_power_curves_divergent_wkg_activity():
+    """When the W/kg peak comes from a different activity, both IDs are shown."""
+    curve = PowerCurve(
+        id="s0",
+        label="This season",
+        secs=[5, 60],
+        values=[890, 480],
+        activity_id=["a1", "a2"],
+        watts_per_kg=[11.87, 6.4],
+        wkg_activity_id=["a9", "a2"],
+    )
+    result = format_power_curves([curve], [5, 60], include_normalised=True)
+    assert "5s: 890W 11.87W/kg [a1] (W/kg: [a9])" in result
+    # Matching IDs render only the single power activity tag
+    assert "1m: 480W 6.40W/kg [a2]" in result
+    assert "1m: 480W 6.40W/kg [a2] (W/kg:" not in result
+
+    # Without normalised output the wkg activity id is irrelevant
+    plain = format_power_curves([curve], [5], include_normalised=False)
+    assert "5s: 890W [a1]" in plain
+    assert "W/kg" not in plain
+
+
+def test_format_power_curves_null_entries():
+    """None entries inside the API arrays render as missing data instead of crashing."""
+    curve = PowerCurve.from_dict(
+        {
+            "id": "s0",
+            "label": "This season",
+            "secs": [5, 60],
+            "values": [None, 480],
+            "activity_id": ["a1", "a2"],
+            "watts_per_kg": [None, 6.4],
+            "wkg_activity_id": ["a1", "a2"],
+        }
+    )
+    result = format_power_curves([curve], [5, 60], include_normalised=True)
+    assert "1m: 480W 6.40W/kg [a2]" in result
+    assert "5s:" not in result
+    assert "No data for: 5s" in result
+
+
+def test_format_power_curves_null_wkg_keeps_watts():
+    """A None W/kg entry omits the W/kg part but keeps the watts line."""
+    curve = PowerCurve.from_dict(
+        {
+            "id": "s0",
+            "label": "This season",
+            "secs": [5],
+            "values": [890],
+            "activity_id": ["a1"],
+            "watts_per_kg": [None],
+            "wkg_activity_id": ["a1"],
+        }
+    )
+    result = format_power_curves([curve], [5], include_normalised=True)
+    assert "5s: 890W [a1]" in result
+    assert "W/kg" not in result
+
+
+def test_format_power_curves_missing_durations_note():
+    """Requested durations absent from the curve are listed explicitly, not dropped."""
+    curve = PowerCurve.from_dict(
+        {
+            "id": "s0",
+            "label": "This season",
+            "secs": [5, 60],
+            "values": [890, 480],
+            "activity_id": ["a1", "a2"],
+            "watts_per_kg": [11.87, 6.4],
+            "wkg_activity_id": ["a1", "a2"],
+        }
+    )
+    result = format_power_curves([curve], [5, 90], include_normalised=True)
+    assert "5s: 890W" in result
+    assert "No data for: 1m30s" in result
+
+
+def test_format_power_curves_without_wkg_arrays():
+    """Curves lacking the W/kg arrays render watts-only lines."""
+    curve = PowerCurve.from_dict(
+        {"id": "s0", "label": "This season", "secs": [5], "values": [890], "activity_id": ["a1"]}
+    )
+    result = format_power_curves([curve], [5], include_normalised=True)
+    assert "5s: 890W [a1]" in result
+
+
+def test_format_gear_list_non_numeric_distance():
+    """A non-numeric distance from the API is skipped instead of crashing."""
+    items = [Gear.from_dict({"id": "b1", "name": "Racer", "distance": "not-a-number"})]
+    result = format_gear_list(items)
+    assert "Name: Racer" in result
+    assert "Distance:" not in result
+
+
+def test_format_wellness_entry_macros_populated():
+    """Nutrition macros render with gram suffixes when present."""
+    entry = WellnessEntry(
+        id="2024-06-01",
+        kcal_consumed=2500,
+        carbohydrates=250.0,
+        protein=120.0,
+        fat_total=80.0,
+    )
+    result = format_wellness_entry(entry)
+    assert "Calories Consumed: 2500" in result
+    assert "Carbohydrates: 250.0 g" in result
+    assert "Protein: 120.0 g" in result
+    assert "Fat: 80.0 g" in result
+
+
+def test_format_wellness_entry_macros_absent_hidden():
+    """Nutrition macro lines are omitted when values are missing."""
+    entry = WellnessEntry(id="2024-06-01", kcal_consumed=2500)
+    result = format_wellness_entry(entry)
+    assert "Calories Consumed: 2500" in result
+    assert "Carbohydrates" not in result
+    assert "Protein" not in result
+    assert "Fat:" not in result
 
 
 def test_format_workout():

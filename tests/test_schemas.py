@@ -20,7 +20,9 @@ from intervals_mcp_server.utils.schemas import (
     EventResponse,
     EventWorkout,
     Folder,
+    Gear,
     IntervalsData,
+    PowerCurve,
     WellnessEntry,
     WellnessSportInfo,
     Workout,
@@ -172,6 +174,103 @@ def test_wellness_entry_from_dict():
     assert len(entry.sport_info) == 1
     assert entry.sport_info[0].type == "Ride"
     assert entry.sport_info[0].eftp == 280.0
+
+
+def test_wellness_entry_from_dict_nutrition_macros():
+    """WellnessEntry.from_dict() maps nutrition macro fields (fatTotal is camelCase)."""
+    data = {
+        "id": "2024-06-01",
+        "kcalConsumed": 2500,
+        "carbohydrates": 250.0,
+        "protein": 120.0,
+        "fatTotal": 80.0,
+    }
+    entry = WellnessEntry.from_dict(data)
+    assert entry.kcal_consumed == 2500
+    assert entry.carbohydrates == 250.0
+    assert entry.protein == 120.0
+    assert entry.fat_total == 80.0
+
+
+def test_wellness_entry_macros_default_none():
+    """Nutrition macro fields default to None when absent."""
+    entry = WellnessEntry.from_dict({"id": "2024-06-01"})
+    assert entry.carbohydrates is None
+    assert entry.protein is None
+    assert entry.fat_total is None
+
+
+# ── Gear ──────────────────────────────────────────────────────────────────
+
+
+def test_gear_from_dict():
+    """Gear.from_dict() maps fields including component_type/activity_count aliases."""
+    gear = Gear.from_dict(
+        {
+            "id": "b1",
+            "component_type": "Bike",
+            "name": "Racer",
+            "distance": 5000.0,
+            "activity_count": 12,
+            "retired": True,
+            "default_for": "Ride",
+        }
+    )
+    assert gear.id == "b1"
+    assert gear.type == "Bike"
+    assert gear.name == "Racer"
+    assert gear.distance == 5000.0
+    assert gear.activity_count == 12
+    assert gear.retired is True
+    assert gear.default_for_type == "Ride"
+
+
+def test_activity_from_dict_gear_id_shapes():
+    """Activity.from_dict() extracts gear info from both gear_id and nested gear object."""
+    from_bare = Activity.from_dict({"id": "a1", "gear_id": "b1"})
+    assert from_bare.gear_id == "b1"
+    assert from_bare.gear_name is None
+
+    from_nested = Activity.from_dict({"id": "a2", "gear": {"id": "b2", "name": "Racer"}})
+    assert from_nested.gear_id == "b2"
+    assert from_nested.gear_name == "Racer"
+
+    without_gear = Activity.from_dict({"id": "a3"})
+    assert without_gear.gear_id is None
+    assert without_gear.gear_name is None
+
+
+# ── PowerCurve ────────────────────────────────────────────────────────────
+
+
+def test_power_curve_from_dict():
+    """PowerCurve.from_dict() maps the parallel-array curve fields."""
+    curve = PowerCurve.from_dict(
+        {
+            "id": "s0",
+            "label": "This season",
+            "start_date_local": "2024-01-01T00:00:00",
+            "end_date_local": "2024-06-01T00:00:00",
+            "secs": [5, 60],
+            "values": [890, 480],
+            "activity_id": ["a1", "a2"],
+            "watts_per_kg": [11.87, 6.4],
+            "wkg_activity_id": ["a1", "a2"],
+        }
+    )
+    assert curve.id == "s0"
+    assert curve.label == "This season"
+    assert curve.secs == [5, 60]
+    assert curve.values == [890, 480]
+    assert curve.watts_per_kg == [11.87, 6.4]
+
+
+def test_power_curve_from_dict_defaults():
+    """PowerCurve.from_dict() falls back to id as label and empty lists."""
+    curve = PowerCurve.from_dict({"id": "s1"})
+    assert curve.label == "s1"
+    assert curve.secs == []
+    assert curve.values == []
 
 
 # ── Athlete ───────────────────────────────────────────────────────────────

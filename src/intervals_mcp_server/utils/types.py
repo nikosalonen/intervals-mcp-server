@@ -92,6 +92,15 @@ class ValueUnits(Enum):
     WATTS = "w"
     PERCENT_FTP = "%ftp"
     CADENCE = "cadence"
+    # Pace units mirror PaceUnits (except NONE); referencing the values keeps
+    # the two enums in sync by construction
+    MINS_KM = PaceUnits.MINS_KM.value
+    MINS_MILE = PaceUnits.MINS_MILE.value
+    SECS_100M = PaceUnits.SECS_100M.value
+    SECS_100Y = PaceUnits.SECS_100Y.value
+    SECS_500M = PaceUnits.SECS_500M.value
+    SECS_400M = PaceUnits.SECS_400M.value
+    SECS_250M = PaceUnits.SECS_250M.value
 
 
 class TransportAliases(StrEnum):
@@ -191,6 +200,13 @@ class Value:
             ValueUnits.PERCENT_FTP: "ftp",
             ValueUnits.POWER_ZONE: "W",
             ValueUnits.CADENCE: "Cadence",
+            ValueUnits.MINS_KM: "min/km",
+            ValueUnits.MINS_MILE: "min/mi",
+            ValueUnits.SECS_100M: "s/100m",
+            ValueUnits.SECS_100Y: "s/100y",
+            ValueUnits.SECS_500M: "s/500m",
+            ValueUnits.SECS_400M: "s/400m",
+            ValueUnits.SECS_250M: "s/250m",
         }
         if self.units is None:
             return ""

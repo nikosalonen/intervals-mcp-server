@@ -30,6 +30,8 @@ from intervals_mcp_server.tools.custom_items import (
     update_custom_item,
 )
 from intervals_mcp_server.tools.athlete import get_athlete, get_sport_settings
+from intervals_mcp_server.tools.gear import get_gear_list
+from intervals_mcp_server.tools.power_curves import get_athlete_power_curves
 from intervals_mcp_server.tools.search import search_activities, search_intervals
 from intervals_mcp_server.tools.workouts import (
     create_bulk_workouts,
@@ -73,6 +75,8 @@ __all__ = [
     "delete_custom_item",
     "get_athlete",
     "get_sport_settings",
+    "get_gear_list",
+    "get_athlete_power_curves",
     "search_activities",
     "search_intervals",
     "list_workouts",
