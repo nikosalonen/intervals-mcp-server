@@ -53,6 +53,40 @@ def test_format_activity_summary():
     assert "ID: 1" in result
 
 
+def test_format_activity_summary_calories_burned_label():
+    """Activity calories are labeled 'Calories burned' with a kcal unit."""
+    data = {"name": "Ride", "id": 2, "calories": 850}
+    result = format_activity_summary(Activity.from_dict(data))
+    assert "Calories burned: 850 kcal" in result
+    assert "Calories: 850\n" not in result
+
+
+def test_format_wellness_entry_macros_populated():
+    """Nutrition macros render with gram suffixes when present."""
+    entry = WellnessEntry(
+        id="2024-06-01",
+        kcal_consumed=2500,
+        carbohydrates=250.0,
+        protein=120.0,
+        fat_total=80.0,
+    )
+    result = format_wellness_entry(entry)
+    assert "Calories Consumed: 2500" in result
+    assert "Carbohydrates: 250.0 g" in result
+    assert "Protein: 120.0 g" in result
+    assert "Fat: 80.0 g" in result
+
+
+def test_format_wellness_entry_macros_absent_hidden():
+    """Nutrition macro lines are omitted when values are missing."""
+    entry = WellnessEntry(id="2024-06-01", kcal_consumed=2500)
+    result = format_wellness_entry(entry)
+    assert "Calories Consumed: 2500" in result
+    assert "Carbohydrates" not in result
+    assert "Protein" not in result
+    assert "Fat:" not in result
+
+
 def test_format_workout():
     """
     Test that format_workout returns a string containing the workout name.

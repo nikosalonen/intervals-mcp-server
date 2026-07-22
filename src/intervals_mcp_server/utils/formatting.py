@@ -94,7 +94,7 @@ Decoupling: {_fmt(activity.decoupling)}
 
 Other Metrics:
 Cadence: {_fmt(activity.average_cadence)} rpm
-Calories: {_fmt(activity.calories)}
+Calories burned: {_fmt(activity.calories)} kcal
 Average Speed: {_fmt(activity.average_speed)} m/s
 Max Speed: {_fmt(activity.max_speed)} m/s
 Average Stride: {_fmt(activity.average_stride)}
@@ -286,12 +286,15 @@ def _format_subjective_feelings(entry: WellnessEntry) -> list[str]:
 def _format_nutrition_hydration(entry: WellnessEntry) -> list[str]:
     """Format nutrition and hydration section."""
     nutrition_lines = []
-    for value, label in [
-        (entry.kcal_consumed, "Calories Consumed"),
-        (entry.hydration_volume, "Hydration Volume"),
+    for value, label, suffix in [
+        (entry.kcal_consumed, "Calories Consumed", ""),
+        (entry.carbohydrates, "Carbohydrates", " g"),
+        (entry.protein, "Protein", " g"),
+        (entry.fat_total, "Fat", " g"),
+        (entry.hydration_volume, "Hydration Volume", ""),
     ]:
         if value is not None:
-            nutrition_lines.append(f"- {label}: {value}")
+            nutrition_lines.append(f"- {label}: {value}{suffix}")
 
     if entry.hydration is not None:
         nutrition_lines.append(f"  Hydration Score: {entry.hydration}/10")

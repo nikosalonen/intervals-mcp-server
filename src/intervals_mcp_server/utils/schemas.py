@@ -591,6 +591,9 @@ class WellnessEntry:
     menstrual_phase: str | None = None
     menstrual_phase_predicted: str | None = None
     kcal_consumed: int | None = None
+    carbohydrates: float | None = None
+    protein: float | None = None
+    fat_total: float | None = None
     sleep_secs: int | None = None
     sleep_score: float | None = None
     sleep_quality: int | None = None
@@ -640,6 +643,9 @@ class WellnessEntry:
             menstrual_phase=_safe_enum(MenstrualPhase, data.get("menstrualPhase")),
             menstrual_phase_predicted=_safe_enum(MenstrualPhase, data.get("menstrualPhasePredicted")),
             kcal_consumed=data.get("kcalConsumed"),
+            carbohydrates=data.get("carbohydrates"),
+            protein=data.get("protein"),
+            fat_total=data.get("fatTotal"),
             sleep_secs=data.get("sleepSecs"),
             sleep_score=data.get("sleepScore"),
             sleep_quality=data.get("sleepQuality"),

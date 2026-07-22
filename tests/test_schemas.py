@@ -174,6 +174,30 @@ def test_wellness_entry_from_dict():
     assert entry.sport_info[0].eftp == 280.0
 
 
+def test_wellness_entry_from_dict_nutrition_macros():
+    """WellnessEntry.from_dict() maps nutrition macro fields (fatTotal is camelCase)."""
+    data = {
+        "id": "2024-06-01",
+        "kcalConsumed": 2500,
+        "carbohydrates": 250.0,
+        "protein": 120.0,
+        "fatTotal": 80.0,
+    }
+    entry = WellnessEntry.from_dict(data)
+    assert entry.kcal_consumed == 2500
+    assert entry.carbohydrates == 250.0
+    assert entry.protein == 120.0
+    assert entry.fat_total == 80.0
+
+
+def test_wellness_entry_macros_default_none():
+    """Nutrition macro fields default to None when absent."""
+    entry = WellnessEntry.from_dict({"id": "2024-06-01"})
+    assert entry.carbohydrates is None
+    assert entry.protein is None
+    assert entry.fat_total is None
+
+
 # ── Athlete ───────────────────────────────────────────────────────────────
 
 
