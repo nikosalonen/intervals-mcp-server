@@ -14,9 +14,11 @@ from intervals_mcp_server.utils.formatting import (
     format_custom_item_details,
     format_event_details,
     format_event_summary,
+    _fmt_curve_duration,
     format_folder_summary,
     format_gear_list,
     format_intervals,
+    format_power_curves,
     format_search_result,
     format_sport_settings,
     format_wellness_entry,
@@ -32,6 +34,7 @@ from intervals_mcp_server.utils.schemas import (
     Folder,
     Gear,
     IntervalsData,
+    PowerCurve,
     WellnessEntry,
     Workout,
 )
@@ -87,6 +90,43 @@ def test_format_gear_list():
     assert "Activities: 80" in result
     assert "Name: Trainers" in result
     assert "Retired: yes" in result
+
+
+def test_fmt_curve_duration():
+    """Durations humanize as 5s / 2m / 2m30s / 20m / 1h / 1h30m."""
+    assert _fmt_curve_duration(5) == "5s"
+    assert _fmt_curve_duration(120) == "2m"
+    assert _fmt_curve_duration(150) == "2m30s"
+    assert _fmt_curve_duration(1200) == "20m"
+    assert _fmt_curve_duration(3600) == "1h"
+    assert _fmt_curve_duration(5400) == "1h30m"
+
+
+def test_format_power_curves():
+    """format_power_curves renders per-curve sections with watts, W/kg and activity IDs."""
+    curve = PowerCurve(
+        id="s0",
+        label="This season",
+        start_date_local="2024-01-01T00:00:00",
+        end_date_local="2024-06-01T00:00:00",
+        secs=[5, 60],
+        values=[890, 480],
+        activity_id=["a1", "a2"],
+        watts_per_kg=[11.87, 6.4],
+        wkg_activity_id=["a1", "a2"],
+    )
+    result = format_power_curves([curve], [5, 60, 3600], include_normalised=True)
+    assert "This season (2024-01-01 to 2024-06-01):" in result
+    assert "5s: 890W 11.87W/kg [a1]" in result
+    assert "1m: 480W 6.40W/kg [a2]" in result
+    assert "1h:" not in result  # not present in the curve — skipped
+
+    plain = format_power_curves([curve], [5], include_normalised=False)
+    assert "5s: 890W [a1]" in plain
+    assert "W/kg" not in plain
+
+    empty = format_power_curves([PowerCurve(id="s1", label="Last season")], [5], True)
+    assert "No data available for requested durations." in empty
 
 
 def test_format_wellness_entry_macros_populated():

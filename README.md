@@ -166,6 +166,7 @@ Once the server is running and Claude Desktop is configured, you can use the fol
 - `get_events`: Retrieve upcoming events (workouts, races, etc.)
 - `get_event_by_id`: Get detailed information for a specific event
 - `get_gear_list`: List the gear catalog (bikes, shoes, etc.); gear names are also resolved in activity output
+- `get_athlete_power_curves`: Get best power per duration for this/last season or a custom date range
 
 ## Usage with ChatGPT
 

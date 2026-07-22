@@ -33,6 +33,34 @@ ACTIVITY_WITH_GEAR_DATA = {
     "gear_id": "b12345",
 }
 
+POWER_CURVES_DATA = {
+    "list": [
+        {
+            "id": "s0",
+            "label": "This season",
+            "start_date_local": "2024-01-01T00:00:00",
+            "end_date_local": "2024-06-01T00:00:00",
+            "secs": [5, 15, 30, 60, 120, 300, 600, 1200, 3600],
+            "values": [890, 720, 610, 480, 410, 350, 320, 300, 270],
+            "activity_id": ["a1", "a1", "a2", "a2", "a3", "a3", "a4", "a4", "a5"],
+            "watts_per_kg": [11.87, 9.6, 8.13, 6.4, 5.47, 4.67, 4.27, 4.0, 3.6],
+            "wkg_activity_id": ["a1", "a1", "a2", "a2", "a3", "a3", "a4", "a4", "a5"],
+        },
+        {
+            "id": "s1",
+            "label": "Last season",
+            "start_date_local": "2023-01-01T00:00:00",
+            "end_date_local": "2023-12-31T00:00:00",
+            # Missing the 3600s duration to exercise the skip path
+            "secs": [5, 15, 30, 60, 120, 300, 600, 1200],
+            "values": [850, 700, 590, 460, 400, 340, 310, 290],
+            "activity_id": ["b1", "b1", "b2", "b2", "b3", "b3", "b4", "b4"],
+            "watts_per_kg": [11.33, 9.33, 7.87, 6.13, 5.33, 4.53, 4.13, 3.87],
+            "wkg_activity_id": ["b1", "b1", "b2", "b2", "b3", "b3", "b4", "b4"],
+        },
+    ]
+}
+
 ATHLETE_DATA = {
     "id": "i1",
     "name": "Test Athlete",

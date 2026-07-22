@@ -740,6 +740,40 @@ class Gear:
 
 
 @dataclass(frozen=True)
+class PowerCurve:
+    """A power curve from /athlete/{id}/power-curves.
+
+    The API returns parallel arrays: values[i] is the best power for secs[i],
+    set in the activity activity_id[i] (and likewise for the W/kg arrays).
+    """
+
+    id: str | None = None
+    label: str | None = None
+    start_date_local: str | None = None
+    end_date_local: str | None = None
+    secs: list[int] = field(default_factory=list)
+    values: list[float] = field(default_factory=list)
+    activity_id: list[str] = field(default_factory=list)
+    watts_per_kg: list[float] = field(default_factory=list)
+    wkg_activity_id: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "PowerCurve":
+        """Create a PowerCurve from a raw API response dict."""
+        return cls(
+            id=data.get("id"),
+            label=_first(data.get("label"), data.get("id")),
+            start_date_local=data.get("start_date_local"),
+            end_date_local=data.get("end_date_local"),
+            secs=_get_list(data, "secs"),
+            values=_get_list(data, "values"),
+            activity_id=_get_list(data, "activity_id"),
+            watts_per_kg=_get_list(data, "watts_per_kg"),
+            wkg_activity_id=_get_list(data, "wkg_activity_id"),
+        )
+
+
+@dataclass(frozen=True)
 class AthleteSportSettings:
     """Athlete sport settings — FTP, zones, LTHR, pacing, warmup/cooldown."""
 

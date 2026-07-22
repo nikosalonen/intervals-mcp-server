@@ -22,6 +22,7 @@ from intervals_mcp_server.utils.schemas import (
     Folder,
     Gear,
     IntervalsData,
+    PowerCurve,
     WellnessEntry,
     WellnessSportInfo,
     Workout,
@@ -237,6 +238,39 @@ def test_activity_from_dict_gear_id_shapes():
     without_gear = Activity.from_dict({"id": "a3"})
     assert without_gear.gear_id is None
     assert without_gear.gear_name is None
+
+
+# ── PowerCurve ────────────────────────────────────────────────────────────
+
+
+def test_power_curve_from_dict():
+    """PowerCurve.from_dict() maps the parallel-array curve fields."""
+    curve = PowerCurve.from_dict(
+        {
+            "id": "s0",
+            "label": "This season",
+            "start_date_local": "2024-01-01T00:00:00",
+            "end_date_local": "2024-06-01T00:00:00",
+            "secs": [5, 60],
+            "values": [890, 480],
+            "activity_id": ["a1", "a2"],
+            "watts_per_kg": [11.87, 6.4],
+            "wkg_activity_id": ["a1", "a2"],
+        }
+    )
+    assert curve.id == "s0"
+    assert curve.label == "This season"
+    assert curve.secs == [5, 60]
+    assert curve.values == [890, 480]
+    assert curve.watts_per_kg == [11.87, 6.4]
+
+
+def test_power_curve_from_dict_defaults():
+    """PowerCurve.from_dict() falls back to id as label and empty lists."""
+    curve = PowerCurve.from_dict({"id": "s1"})
+    assert curve.label == "s1"
+    assert curve.secs == []
+    assert curve.values == []
 
 
 # ── Athlete ───────────────────────────────────────────────────────────────

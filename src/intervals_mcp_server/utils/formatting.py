@@ -21,6 +21,7 @@ from intervals_mcp_server.utils.schemas import (
     Folder,
     Gear,
     IntervalsData,
+    PowerCurve,
     WellnessEntry,
     Workout,
 )
@@ -523,6 +524,52 @@ def format_gear_list(gear_items: list[Gear]) -> str:
             lines.append(f"Default for: {item.default_for_type}")
         if item.retired:
             lines.append("Retired: yes")
+    return "\n".join(lines)
+
+
+def _fmt_curve_duration(secs: int) -> str:
+    """Format seconds into a concise duration label (5s, 2m, 1h30m)."""
+    if secs < 60:
+        return f"{secs}s"
+    if secs < 3600:
+        mins, rem = divmod(secs, 60)
+        return f"{mins}m{rem}s" if rem else f"{mins}m"
+    hours, rem = divmod(secs, 3600)
+    mins = rem // 60
+    return f"{hours}h{mins}m" if mins else f"{hours}h"
+
+
+def format_power_curves(
+    curves: list[PowerCurve],
+    durations: list[int],
+    include_normalised: bool,
+) -> str:
+    """Format power curves into a readable string, one section per curve."""
+    lines = ["Power Curves:"]
+    for curve in curves:
+        date_range = ""
+        if curve.start_date_local and curve.end_date_local:
+            date_range = f" ({curve.start_date_local[:10]} to {curve.end_date_local[:10]})"
+        lines.append("")
+        lines.append(f"{_fmt(curve.label)}{date_range}:")
+
+        sec_to_idx = {s: i for i, s in enumerate(curve.secs)}
+        data_lines = []
+        for duration in durations:
+            idx = sec_to_idx.get(duration)
+            if idx is None or idx >= len(curve.values):
+                continue
+            parts = [f"  {_fmt_curve_duration(duration)}: {curve.values[idx]}W"]
+            if include_normalised and idx < len(curve.watts_per_kg):
+                parts.append(f"{curve.watts_per_kg[idx]:.2f}W/kg")
+            if idx < len(curve.activity_id) and curve.activity_id[idx]:
+                parts.append(f"[{curve.activity_id[idx]}]")
+            data_lines.append(" ".join(parts))
+
+        if data_lines:
+            lines.extend(data_lines)
+        else:
+            lines.append("  No data available for requested durations.")
     return "\n".join(lines)
 
 
