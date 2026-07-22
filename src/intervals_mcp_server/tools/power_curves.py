@@ -54,13 +54,18 @@ async def get_athlete_power_curves(  # pylint: disable=too-many-arguments,too-ma
     """Get power curves (best power per duration) for an athlete from Intervals.icu.
 
     Returns the best power output for the selected durations across the selected
-    time periods. Power values are in watts.
+    time periods. Power values are in watts. Each duration line ends with the ID
+    of the activity where the best value was set, in [brackets]; when the best
+    W/kg was set in a different activity than the best watts, that activity's ID
+    is appended separately as (W/kg: [id]). Durations without data are listed in
+    a trailing "No data for:" note per curve.
 
     Args:
         activity_type: Activity type (e.g. "Ride", "Run", "VirtualRide"). Default "Ride".
         durations: Durations in seconds to include. Default [5, 15, 30, 60, 120, 300, 600, 1200, 3600].
         indoor_outdoor: Filter by location — "indoor" or "outdoor". Omit for no filtering.
-        start_date: Start date (YYYY-MM-DD) for a custom date range curve. Requires end_date.
+        start_date: Start date (YYYY-MM-DD) for a custom date range curve. Requires end_date
+            and must be strictly before it.
         end_date: End date (YYYY-MM-DD) for a custom date range curve. Requires start_date.
         this_season: Include this season's curve (default True).
         last_season: Include last season's curve (default True).
@@ -74,6 +79,10 @@ async def get_athlete_power_curves(  # pylint: disable=too-many-arguments,too-ma
 
     if indoor_outdoor not in (None, "indoor", "outdoor"):
         return "Error: indoor_outdoor must be 'indoor', 'outdoor', or omitted."
+
+    # Treat empty strings as omitted so they get the same validation as None
+    start_date = start_date or None
+    end_date = end_date or None
 
     date_error = _validate_date_range(start_date, end_date)
     if date_error:
@@ -95,9 +104,11 @@ async def get_athlete_power_curves(  # pylint: disable=too-many-arguments,too-ma
     params: dict[str, str] = {
         "curves": ",".join(curve_keys),
         "type": activity_type,
-        "includeRanks": "false",
+        "includeRanks": "false",  # rank data isn't parsed into PowerCurve
     }
     if indoor_outdoor:
+        # The API's indoor filter takes the strings "indoor"/"outdoor", not a
+        # boolean — booleans get a 422 "Indoor filter expected indoor/outdoor value"
         params["filters"] = json.dumps([{"field_id": "indoor", "value": indoor_outdoor, "id": 1}])
 
     result = await make_intervals_request(
@@ -109,8 +120,18 @@ async def get_athlete_power_curves(  # pylint: disable=too-many-arguments,too-ma
     if isinstance(result, dict) and result.get("error"):
         return f"Error fetching power curves: {result.get('message', 'Unknown error')}"
 
-    curve_list = result.get("list", []) if isinstance(result, dict) else result
-    if not isinstance(curve_list, list) or not curve_list:
+    if isinstance(result, dict):
+        curve_list = result.get("list")
+    else:
+        curve_list = result
+    if not isinstance(curve_list, list):
+        logger.error(
+            "Unexpected power curves payload for athlete %s: got %s",
+            athlete_id_to_use,
+            type(result).__name__,
+        )
+        return "Error: Unexpected response from the power curves API."
+    if not curve_list:
         return f"No power curve data found for athlete {athlete_id_to_use} ({activity_type})."
 
     try:

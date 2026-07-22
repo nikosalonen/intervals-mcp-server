@@ -1,8 +1,9 @@
 """
 Gear MCP tools for Intervals.icu.
 
-Activity payloads from Intervals.icu carry only the gear ID (e.g. "b16177481");
-the gear name lives in the separate /athlete/{id}/gear endpoint. This module
+Activity payloads from Intervals.icu often carry only the gear ID (e.g.
+"b16177481") without the name; the full gear catalog lives in the separate
+/athlete/{id}/gear endpoint. This module
 caches the gear catalog per athlete for the lifetime of the MCP process so
 activity tools can resolve names without an extra API round-trip per activity.
 Pass refresh=True to get_gear_list to re-fetch.
@@ -46,7 +47,10 @@ async def _fetch_gear_catalog(
         return f"Error fetching gear: {result.get('message', 'Unknown error')}"
 
     if not isinstance(result, list):
-        return "Unexpected response from API."
+        logger.error(
+            "Unexpected gear payload for athlete %s: got %s", athlete_id, type(result).__name__
+        )
+        return f"Error: Unexpected response from the gear API for athlete {athlete_id}."
 
     try:
         catalog = [Gear.from_dict(item) for item in result if isinstance(item, dict)]
@@ -68,6 +72,7 @@ async def get_gear_name_map(athlete_id: str, api_key: str | None = None) -> dict
         return {}
     catalog = await _fetch_gear_catalog(athlete_id, api_key=api_key)
     if isinstance(catalog, str):
+        logger.warning("Gear name resolution unavailable for athlete %s: %s", athlete_id, catalog)
         return {}
     return {item.id: item.name for item in catalog if item.id and item.name}
 

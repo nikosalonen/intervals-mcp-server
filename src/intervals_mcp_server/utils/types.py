@@ -92,13 +92,15 @@ class ValueUnits(Enum):
     WATTS = "w"
     PERCENT_FTP = "%ftp"
     CADENCE = "cadence"
-    MINS_KM = "MINS_KM"
-    MINS_MILE = "MINS_MILE"
-    SECS_100M = "SECS_100M"
-    SECS_100Y = "SECS_100Y"
-    SECS_500M = "SECS_500M"
-    SECS_400M = "SECS_400M"
-    SECS_250M = "SECS_250M"
+    # Pace units mirror PaceUnits (except NONE); referencing the values keeps
+    # the two enums in sync by construction
+    MINS_KM = PaceUnits.MINS_KM.value
+    MINS_MILE = PaceUnits.MINS_MILE.value
+    SECS_100M = PaceUnits.SECS_100M.value
+    SECS_100Y = PaceUnits.SECS_100Y.value
+    SECS_500M = PaceUnits.SECS_500M.value
+    SECS_400M = PaceUnits.SECS_400M.value
+    SECS_250M = PaceUnits.SECS_250M.value
 
 
 class TransportAliases(StrEnum):

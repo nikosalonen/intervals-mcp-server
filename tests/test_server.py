@@ -7,6 +7,7 @@ and workouts tools, including parse-failure placeholders.
 """
 
 import asyncio
+import logging
 import os
 import pathlib
 import sys
@@ -50,6 +51,7 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     update_season,
     update_sport_settings,
 )
+from intervals_mcp_server.tools.gear import get_gear_name_map  # pylint: disable=wrong-import-position
 from tests.sample_data import (  # pylint: disable=wrong-import-position
     ACTIVITY_WITH_GEAR_DATA,
     ATHLETE_DATA,
@@ -2066,6 +2068,110 @@ def test_get_gear_list_cache_and_refresh(monkeypatch):
     assert calls["count"] == 2
 
 
+def test_get_gear_list_error(monkeypatch):
+    """An API error dict surfaces as an error message."""
+    _clear_gear_cache(monkeypatch)
+
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "boom"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    result = asyncio.run(get_gear_list(athlete_id="i1"))
+    assert "Error fetching gear" in result
+    assert "boom" in result
+
+
+def test_get_gear_list_unexpected_response(monkeypatch):
+    """A non-list payload is reported as an error naming the athlete."""
+    _clear_gear_cache(monkeypatch)
+
+    async def fake_request(*_args, **_kwargs):
+        return "garbage"
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    result = asyncio.run(get_gear_list(athlete_id="i1"))
+    assert "Unexpected response" in result
+    assert "i1" in result
+
+
+def test_get_gear_list_failed_fetch_not_cached(monkeypatch):
+    """A failed catalog fetch is not cached; the next call retries and succeeds."""
+    _clear_gear_cache(monkeypatch)
+    calls = {"count": 0}
+
+    async def fake_request(*_args, **_kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return {"error": True, "message": "boom"}
+        return GEAR_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    first = asyncio.run(get_gear_list(athlete_id="i1"))
+    assert "Error fetching gear" in first
+
+    second = asyncio.run(get_gear_list(athlete_id="i1"))
+    assert "Canyon Ultimate" in second
+    assert calls["count"] == 2
+
+
+def test_get_gear_name_map_failure_logs_warning(monkeypatch, caplog):
+    """A failed gear lookup is logged so silent degradation is visible to operators."""
+    _clear_gear_cache(monkeypatch)
+
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "boom"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    with caplog.at_level(logging.WARNING, logger="intervals_mcp_server.tools.gear"):
+        result = asyncio.run(get_gear_name_map("i1"))
+
+    assert result == {}
+    assert any("gear name resolution" in record.message.lower() for record in caplog.records)
+
+
+def test_get_activities_gear_lookup_failure_degrades(monkeypatch):
+    """get_activities falls back to the bare gear ID when the catalog fetch fails."""
+    _clear_gear_cache(monkeypatch)
+
+    async def fake_request(*_args, **kwargs):
+        if "/gear" in kwargs.get("url", ""):
+            return {"error": True, "message": "boom"}
+        return [ACTIVITY_WITH_GEAR_DATA]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.activities.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    result = asyncio.run(get_activities(athlete_id="i1", limit=1, include_unnamed=True))
+    assert "Gear: b12345" in result
+
+
+def test_get_activities_no_gear_skips_catalog_fetch(monkeypatch):
+    """The gear catalog is not fetched when no activity carries gear info."""
+    _clear_gear_cache(monkeypatch)
+    urls: list[str] = []
+
+    async def fake_request(*_args, **kwargs):
+        urls.append(kwargs.get("url", ""))
+        return [{"id": "a1", "name": "Morning Run", "type": "Run", "start_date": "2024-01-01T08:00:00"}]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.activities.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.gear.make_intervals_request", fake_request)
+
+    result = asyncio.run(get_activities(athlete_id="i1", limit=1, include_unnamed=True))
+    assert "Morning Run" in result
+    assert not any("/gear" in url for url in urls)
+
+
 def test_get_activities_resolves_gear_name(monkeypatch):
     """get_activities resolves gear IDs to names via the gear catalog."""
     _clear_gear_cache(monkeypatch)
@@ -2242,3 +2348,77 @@ def test_get_athlete_power_curves_empty(monkeypatch):
 
     result = asyncio.run(get_athlete_power_curves(athlete_id="i1"))
     assert "No power curve data found" in result
+
+
+def test_get_athlete_power_curves_error(monkeypatch):
+    """An API error dict surfaces as an error message, not as missing data."""
+
+    async def fake_request(*_args, **_kwargs):
+        return {"error": True, "message": "boom"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.power_curves.make_intervals_request", fake_request
+    )
+
+    result = asyncio.run(get_athlete_power_curves(athlete_id="i1"))
+    assert "Error fetching power curves" in result
+    assert "boom" in result
+
+
+def test_get_athlete_power_curves_unexpected_response(monkeypatch):
+    """A payload without a curve list is reported as an error, not as 'no data'."""
+    responses = iter([{"unexpected": "shape"}, "garbage"])
+
+    async def fake_request(*_args, **_kwargs):
+        return next(responses)
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.power_curves.make_intervals_request", fake_request
+    )
+
+    result = asyncio.run(get_athlete_power_curves(athlete_id="i1"))
+    assert "Unexpected response" in result
+
+    result = asyncio.run(get_athlete_power_curves(athlete_id="i1"))
+    assert "Unexpected response" in result
+
+
+def test_get_athlete_power_curves_bare_list_response(monkeypatch):
+    """A bare list payload (no wrapping dict) is accepted."""
+
+    async def fake_request(*_args, **_kwargs):
+        return POWER_CURVES_DATA["list"]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.power_curves.make_intervals_request", fake_request
+    )
+
+    result = asyncio.run(get_athlete_power_curves(athlete_id="i1"))
+    assert "This season" in result
+
+
+def test_get_athlete_power_curves_empty_string_dates(monkeypatch):
+    """Empty-string dates are treated as omitted rather than silently ignored."""
+    captured: dict = {}
+
+    async def fake_request(*_args, **kwargs):
+        captured.update(kwargs.get("params", {}))
+        return POWER_CURVES_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.power_curves.make_intervals_request", fake_request
+    )
+
+    # One empty, one set — same paired-parameter error as None + value
+    result = asyncio.run(
+        get_athlete_power_curves(athlete_id="i1", start_date="", end_date="2024-06-01")
+    )
+    assert "must be provided together" in result
+
+    # Both empty — treated as no custom range, only season curves requested
+    asyncio.run(get_athlete_power_curves(athlete_id="i1", start_date="", end_date=""))
+    assert captured["curves"] == "s0,s1"

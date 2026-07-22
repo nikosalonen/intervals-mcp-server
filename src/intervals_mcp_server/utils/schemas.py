@@ -598,9 +598,9 @@ class WellnessEntry:
     menstrual_phase: str | None = None
     menstrual_phase_predicted: str | None = None
     kcal_consumed: int | None = None
-    carbohydrates: float | None = None
-    protein: float | None = None
-    fat_total: float | None = None
+    carbohydrates: float | None = None  # grams
+    protein: float | None = None  # grams
+    fat_total: float | None = None  # grams
     sleep_secs: int | None = None
     sleep_score: float | None = None
     sleep_quality: int | None = None
@@ -730,6 +730,8 @@ class Gear:
         """Create a Gear from a raw API response dict."""
         return cls(
             id=data.get("id"),
+            # Components carry component_type (chain, cassette, ...); prefer it
+            # over the generic type ("Bike") when both are present
             type=_first(data.get("component_type"), data.get("type")),
             name=_first(data.get("name"), data.get("display_name")),
             distance=data.get("distance"),

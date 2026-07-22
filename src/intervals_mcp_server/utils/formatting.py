@@ -50,7 +50,7 @@ def _fmt_datetime(value: str | None) -> str:
 
 
 def _fmt_gear(activity: Activity) -> str:
-    """Format an activity's gear as 'Name (id)', bare id, or N/A."""
+    """Format an activity's gear as 'Name (id)', bare name, bare id, or N/A."""
     if activity.gear_name and activity.gear_id:
         return f"{activity.gear_name} ({activity.gear_id})"
     if activity.gear_name:
@@ -516,7 +516,7 @@ def format_gear_list(gear_items: list[Gear]) -> str:
         lines.append(f"Name: {_fmt(item.name)}")
         lines.append(f"ID: {_fmt(item.id)}")
         lines.append(f"Type: {_fmt(item.type)}")
-        if item.distance is not None:
+        if isinstance(item.distance, (int, float)):
             lines.append(f"Distance: {item.distance / 1000:.1f} km")
         if item.activity_count is not None:
             lines.append(f"Activities: {item.activity_count}")
@@ -555,13 +555,19 @@ def format_power_curves(
 
         sec_to_idx = {s: i for i, s in enumerate(curve.secs)}
         data_lines = []
+        missing = []
         for duration in durations:
             idx = sec_to_idx.get(duration)
-            if idx is None or idx >= len(curve.values):
+            # The API omits durations it has no sample for, and may return null
+            # elements inside the parallel arrays; both count as missing data.
+            watts = curve.values[idx] if idx is not None and idx < len(curve.values) else None
+            if idx is None or watts is None:
+                missing.append(_fmt_curve_duration(duration))
                 continue
-            parts = [f"  {_fmt_curve_duration(duration)}: {curve.values[idx]}W"]
-            if include_normalised and idx < len(curve.watts_per_kg):
-                parts.append(f"{curve.watts_per_kg[idx]:.2f}W/kg")
+            parts = [f"  {_fmt_curve_duration(duration)}: {watts}W"]
+            wkg = curve.watts_per_kg[idx] if idx < len(curve.watts_per_kg) else None
+            if include_normalised and isinstance(wkg, (int, float)):
+                parts.append(f"{wkg:.2f}W/kg")
             power_aid = curve.activity_id[idx] if idx < len(curve.activity_id) else None
             if power_aid:
                 parts.append(f"[{power_aid}]")
@@ -574,6 +580,8 @@ def format_power_curves(
 
         if data_lines:
             lines.extend(data_lines)
+            if missing:
+                lines.append(f"  No data for: {', '.join(missing)}")
         else:
             lines.append("  No data available for requested durations.")
     return "\n".join(lines)
