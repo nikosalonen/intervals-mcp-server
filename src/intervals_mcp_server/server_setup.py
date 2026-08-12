@@ -22,6 +22,8 @@ logger = logging.getLogger("intervals_icu_mcp_server")
 # defaults, keeping the FASTMCP_* names that earlier versions accepted.
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
+MIN_PORT = 1
+MAX_PORT = 65535
 SSE_PATH = "/sse"
 MESSAGE_PATH = "/messages/"
 STREAMABLE_HTTP_PATH = "/mcp"
@@ -52,7 +54,7 @@ def _resolve_bind_address() -> tuple[str, int]:
         tuple[str, int]: The host and port to bind to.
 
     Raises:
-        ValueError: If FASTMCP_PORT is set but is not an integer.
+        ValueError: If FASTMCP_PORT is not an integer in the range 1-65535.
     """
     host = os.getenv("FASTMCP_HOST", DEFAULT_HOST)
     port_env = os.getenv("FASTMCP_PORT")
@@ -61,9 +63,17 @@ def _resolve_bind_address() -> tuple[str, int]:
         return host, DEFAULT_PORT
 
     try:
-        return host, int(port_env)
+        port = int(port_env)
     except ValueError as exc:
         raise ValueError(f"FASTMCP_PORT must be an integer, got {port_env!r}.") from exc
+
+    # int() only validates syntax; out-of-range values would otherwise surface as
+    # an opaque socket error at bind time. Port 0 is excluded because the OS would
+    # pick an arbitrary port, contradicting the URL logged below.
+    if not MIN_PORT <= port <= MAX_PORT:
+        raise ValueError(f"FASTMCP_PORT must be between {MIN_PORT} and {MAX_PORT}, got {port}.")
+
+    return host, port
 
 
 def setup_transport() -> TransportAliases:

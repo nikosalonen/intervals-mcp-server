@@ -150,6 +150,32 @@ def test_non_numeric_port_is_rejected_with_a_clear_message(
         start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize("port", ["-1", "0", "65536", "99999"])
+def test_port_outside_the_valid_range_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, port: str
+) -> None:
+    """int() only checks syntax, so these would otherwise fail as socket errors."""
+    monkeypatch.setenv("FASTMCP_PORT", port)
+    server = RecordingServer()
+
+    with pytest.raises(ValueError, match="FASTMCP_PORT"):
+        start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert not server.calls, "server must not start with an out-of-range port"
+
+
+@pytest.mark.parametrize("port", ["1", "8765", "65535"])
+def test_ports_at_the_edges_of_the_valid_range_are_accepted(
+    monkeypatch: pytest.MonkeyPatch, port: str
+) -> None:
+    monkeypatch.setenv("FASTMCP_PORT", port)
+    server = RecordingServer()
+
+    start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert server.last["kwargs"]["port"] == int(port)
+
+
 def test_sse_mount_path_fails_loudly_rather_than_being_ignored(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
