@@ -1,17 +1,24 @@
 """
 Tests for transport selection and server startup.
 
-These cover the wiring that MCP SDK v2 no longer does implicitly: v1 read
-FASTMCP_* environment variables via pydantic-settings, while v2 reads no
-environment at all, so `start_server` must pass host/port explicitly.
+These cover the FASTMCP_* wiring that lives in this project. The MCP SDK reads
+no environment of its own, so `start_server` has to resolve and forward it.
 """
 
+import inspect
+import logging
+import os
+import subprocess
+import sys
+import typing
 from typing import Any
 
 import pytest
+from mcp.server.mcpserver import MCPServer
 
+from intervals_mcp_server import server_setup as ss
+from intervals_mcp_server.config import LOG_LEVELS, resolve_log_level
 from intervals_mcp_server.server_setup import (
-    resolve_log_level,
     setup_transport,
     start_server,
 )
@@ -58,10 +65,62 @@ def test_log_level_is_read_from_the_environment(monkeypatch: pytest.MonkeyPatch)
     assert resolve_log_level() == "DEBUG"
 
 
-def test_unknown_log_level_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("FASTMCP_LOG_LEVEL", "chatty")
-    with pytest.raises(ValueError, match="FASTMCP_LOG_LEVEL"):
-        resolve_log_level()
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("WARN", "WARNING"), ("warn", "WARNING"), ("FATAL", "CRITICAL")],
+)
+def test_common_level_aliases_are_accepted(
+    monkeypatch: pytest.MonkeyPatch, raw: str, expected: str
+) -> None:
+    """Python's own logging module accepts WARN and FATAL, so operators will too."""
+    monkeypatch.setenv("FASTMCP_LOG_LEVEL", raw)
+    assert resolve_log_level() == expected
+
+
+@pytest.mark.parametrize("raw", ["  debug  ", "debug\n"])
+def test_surrounding_whitespace_is_stripped(monkeypatch: pytest.MonkeyPatch, raw: str) -> None:
+    """A trailing newline is what a .env file or `export` typo actually produces."""
+    monkeypatch.setenv("FASTMCP_LOG_LEVEL", raw)
+    assert resolve_log_level() == "DEBUG"
+
+
+@pytest.mark.parametrize("raw", ["chatty", "", "   "])
+def test_unknown_log_level_falls_back_to_info_without_raising(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, raw: str
+) -> None:
+    """
+    resolve_log_level runs at import time (mcp_instance builds MCPServer at module
+    level), so raising would make a log-verbosity typo break every import path --
+    including pytest collection. Degrade to INFO and say so instead.
+    """
+    monkeypatch.setenv("FASTMCP_LOG_LEVEL", raw)
+
+    with caplog.at_level(logging.WARNING, logger="intervals_icu_mcp_server"):
+        assert resolve_log_level() == "INFO"
+
+    assert "FASTMCP_LOG_LEVEL" in caplog.text
+    assert repr(raw) in caplog.text, "the rejected value must appear in the warning"
+
+
+def test_a_bad_log_level_does_not_break_importing_the_package(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Guards the CLAUDE.md rule that config is validated without breaking imports."""
+    env = {
+        **os.environ,
+        "FASTMCP_LOG_LEVEL": "chatty",
+        "API_KEY": "x",
+        "ATHLETE_ID": "i123456",
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", "import intervals_mcp_server.tools.activities"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "FASTMCP_LOG_LEVEL" in result.stderr, "the fallback must be reported"
 
 
 # --- setup_transport ---------------------------------------------------
@@ -92,12 +151,15 @@ def test_unsupported_transport_names_the_allowed_values(
 # --- start_server: stdio -----------------------------------------------
 
 
-def test_stdio_runs_without_binding_a_socket() -> None:
+def test_stdio_runs_with_no_transport_options_at_all() -> None:
+    """
+    Asserted as an exact call rather than per-key: `kwargs.get("host") is None`
+    also holds for run(transport="sse"), which would break stdio framing.
+    """
     server = RecordingServer()
     start_server(server, TransportAliases.STDIO)  # type: ignore[arg-type]
 
-    assert server.last["kwargs"].get("host") is None
-    assert server.last["kwargs"].get("port") is None
+    assert server.last == {"args": (), "kwargs": {}}
 
 
 # --- start_server: network transports ----------------------------------
@@ -113,7 +175,7 @@ def test_stdio_runs_without_binding_a_socket() -> None:
 def test_network_transport_forwards_host_and_port_from_env(
     monkeypatch: pytest.MonkeyPatch, transport: TransportAliases, expected: str
 ) -> None:
-    """v2 reads no environment itself, so we must forward these explicitly."""
+    """The SDK reads no environment, so these only work if we forward them."""
     monkeypatch.setenv("FASTMCP_HOST", "0.0.0.0")
     monkeypatch.setenv("FASTMCP_PORT", "8765")
 
@@ -154,7 +216,11 @@ def test_non_numeric_port_is_rejected_with_a_clear_message(
 def test_port_outside_the_valid_range_is_rejected(
     monkeypatch: pytest.MonkeyPatch, port: str
 ) -> None:
-    """int() only checks syntax, so these would otherwise fail as socket errors."""
+    """
+    -1/65536/99999 would otherwise surface as an OverflowError from deep in the
+    socket layer. 0 is different: it would bind *successfully* on an OS-chosen
+    port, contradicting the URL start_server announces. Both are refused up front.
+    """
     monkeypatch.setenv("FASTMCP_PORT", port)
     server = RecordingServer()
 
@@ -176,6 +242,154 @@ def test_ports_at_the_edges_of_the_valid_range_are_accepted(
     assert server.last["kwargs"]["port"] == int(port)
 
 
+def test_host_is_honoured_when_only_the_host_is_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The standard container config: bind every interface, leave the port default."""
+    monkeypatch.setenv("FASTMCP_HOST", "0.0.0.0")
+    server = RecordingServer()
+
+    start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert server.last["kwargs"]["host"] == "0.0.0.0"
+    assert server.last["kwargs"]["port"] == 8000
+
+
+@pytest.mark.parametrize("raw", ["", "   "])
+def test_blank_host_falls_back_to_loopback_rather_than_all_interfaces(
+    monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    """
+    `FASTMCP_HOST=${HOST}` with HOST unset exports an empty string, so getenv's
+    default never fires. bind("") means 0.0.0.0, which would also drop the SDK's
+    auto-enabled DNS-rebinding protection on an unauthenticated server.
+    """
+    monkeypatch.setenv("FASTMCP_HOST", raw)
+    server = RecordingServer()
+
+    start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert server.last["kwargs"]["host"] == "127.0.0.1"
+
+
+def test_surrounding_whitespace_is_stripped_from_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Otherwise this dies at bind time as an opaque gaierror."""
+    monkeypatch.setenv("FASTMCP_HOST", "  0.0.0.0  ")
+    server = RecordingServer()
+
+    start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert server.last["kwargs"]["host"] == "0.0.0.0"
+
+
+def test_binding_beyond_loopback_warns_even_when_logging_is_silenced(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """
+    The SDK auto-enables DNS-rebinding protection only for loopback hosts
+    (`host in ("127.0.0.1", "localhost", "::1")`). This server ships no auth,
+    so a wider bind must not be silent -- not even with FASTMCP_LOG_LEVEL=ERROR.
+    """
+    monkeypatch.setenv("FASTMCP_HOST", "0.0.0.0")
+    server = RecordingServer()
+
+    logger = logging.getLogger("intervals_icu_mcp_server")
+    original = logger.level
+    logger.setLevel(logging.CRITICAL)
+    try:
+        start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+    finally:
+        logger.setLevel(original)
+
+    err = capsys.readouterr().err
+    assert "0.0.0.0" in err
+    assert "rebinding" in err.lower()
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1", "[::1]"])
+def test_loopback_bind_stays_quiet(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], host: str
+) -> None:
+    monkeypatch.setenv("FASTMCP_HOST", host)
+    server = RecordingServer()
+
+    start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert "rebinding" not in capsys.readouterr().err.lower()
+
+
+def test_brackets_are_stripped_from_an_ipv6_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The socket layer rejects "[::1]" with an opaque gaierror."""
+    monkeypatch.setenv("FASTMCP_HOST", "[::1]")
+    server = RecordingServer()
+
+    start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert server.last["kwargs"]["host"] == "::1"
+
+
+@pytest.mark.parametrize("raw", ["80_80", "８０８０", "+80"])
+def test_ports_that_only_int_would_accept_are_rejected(
+    monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    """int() takes underscores and non-ASCII digits, silently landing on a different port."""
+    monkeypatch.setenv("FASTMCP_PORT", raw)
+    server = RecordingServer()
+
+    with pytest.raises(ValueError, match="FASTMCP_PORT"):
+        start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert not server.calls
+
+
+# --- start_server: the bind banner ------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("transport", "expected_url"),
+    [
+        (TransportAliases.SSE, "http://127.0.0.1:8000/sse"),
+        (TransportAliases.STREAMABLE_HTTP, "http://127.0.0.1:8000/mcp"),
+    ],
+)
+def test_bind_url_is_announced_even_when_logging_is_silenced(
+    capsys: pytest.CaptureFixture[str],
+    transport: TransportAliases,
+    expected_url: str,
+) -> None:
+    """
+    README tells the ChatGPT connector user to copy this URL out of the startup
+    output, so FASTMCP_LOG_LEVEL=ERROR must not be able to suppress it.
+    """
+    logger = logging.getLogger("intervals_icu_mcp_server")
+    original = logger.level
+    logger.setLevel(logging.CRITICAL)
+    try:
+        start_server(RecordingServer(), transport)  # type: ignore[arg-type]
+    finally:
+        logger.setLevel(original)
+
+    assert expected_url in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("host", "expected_url"),
+    [("::1", "http://[::1]:8000/sse"), ("[::1]", "http://[::1]:8000/sse"), ("::", "http://[::]:8000/sse")],
+)
+def test_ipv6_hosts_are_bracketed_in_the_announced_url(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    host: str,
+    expected_url: str,
+) -> None:
+    monkeypatch.setenv("FASTMCP_HOST", host)
+
+    start_server(RecordingServer(), TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert expected_url in capsys.readouterr().err
+
+
+# --- start_server: MCP_SSE_MOUNT_PATH ---------------------------------
+
+
 def test_sse_mount_path_fails_loudly_rather_than_being_ignored(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -191,3 +405,129 @@ def test_sse_mount_path_fails_loudly_rather_than_being_ignored(
         start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
 
     assert not server.calls, "server must not start with an unsupported mount path"
+
+
+@pytest.mark.parametrize("raw", ["", "/"])
+def test_mount_paths_that_never_did_anything_are_treated_as_unset(
+    monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    """`/` was v1's own default and a provable no-op, so refusing to boot on it is wrong."""
+    monkeypatch.setenv("MCP_SSE_MOUNT_PATH", raw)
+    server = RecordingServer()
+
+    start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert server.last["kwargs"]["transport"] == "sse"
+
+
+def test_mount_path_only_warns_on_transports_that_never_read_it(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A stale .env line must not stop a streamable-http server from starting."""
+    monkeypatch.setenv("MCP_SSE_MOUNT_PATH", "/intervals")
+    server = RecordingServer()
+
+    start_server(server, TransportAliases.STREAMABLE_HTTP)  # type: ignore[arg-type]
+
+    assert server.last["kwargs"]["transport"] == "streamable-http"
+    assert "MCP_SSE_MOUNT_PATH" in capsys.readouterr().err
+
+
+def test_mount_path_is_ignored_for_stdio(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MCP_SSE_MOUNT_PATH", "/intervals")
+    server = RecordingServer()
+
+    start_server(server, TransportAliases.STDIO)  # type: ignore[arg-type]
+
+    assert server.last == {"args": (), "kwargs": {}}
+
+
+# --- contracts against the installed SDK ------------------------------
+
+
+@pytest.mark.parametrize(
+    ("transport", "method"),
+    [
+        (TransportAliases.SSE, MCPServer.run_sse_async),
+        (TransportAliases.STREAMABLE_HTTP, MCPServer.run_streamable_http_async),
+    ],
+)
+def test_run_kwargs_bind_to_the_real_sdk_signature(
+    transport: TransportAliases, method: Any
+) -> None:
+    """
+    run() forwards **kwargs: Any straight through, so mypy cannot see an SDK
+    rename and RecordingServer would happily swallow one. Bind for real.
+    """
+    server = RecordingServer()
+    start_server(server, transport)  # type: ignore[arg-type]
+
+    kwargs = dict(server.last["kwargs"])
+    del kwargs["transport"]
+    inspect.signature(method).bind(object(), **kwargs)
+
+
+def test_path_constants_still_match_the_sdk_defaults() -> None:
+    """
+    These are pinned deliberately, not derived -- README publishes them. The test
+    exists so an SDK default moving under us is a visible decision, not a drift.
+    """
+    sse = inspect.signature(MCPServer.run_sse_async).parameters
+    http = inspect.signature(MCPServer.run_streamable_http_async).parameters
+
+    assert sse["sse_path"].default == ss.SSE_PATH
+    assert sse["message_path"].default == ss.MESSAGE_PATH
+    assert http["streamable_http_path"].default == ss.STREAMABLE_HTTP_PATH
+    assert sse["host"].default == ss.DEFAULT_HOST
+    assert sse["port"].default == ss.DEFAULT_PORT
+
+
+def test_log_levels_match_the_sdk_literal() -> None:
+    hints = typing.get_type_hints(MCPServer.__init__)
+    assert set(typing.get_args(hints["log_level"])) == set(LOG_LEVELS)
+
+
+def test_log_level_reaches_the_mcpserver_instance() -> None:
+    """
+    mcp_instance builds MCPServer at import time, so this runs in a subprocess:
+    reloading the module would create a second instance while tools/ still hold
+    the first, corrupting tool registration for the rest of the session.
+    """
+    env = {
+        **os.environ,
+        "FASTMCP_LOG_LEVEL": "warning",
+        "API_KEY": "x",
+        "ATHLETE_ID": "i123456",
+    }
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from intervals_mcp_server.mcp_instance import mcp; print(mcp.settings.log_level)",
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert result.stdout.strip() == "WARNING"
+
+
+def test_server_reports_its_package_version_to_clients() -> None:
+    """An empty serverInfo.version shows up as blank in clients that surface it."""
+    env = {**os.environ, "API_KEY": "x", "ATHLETE_ID": "i123456"}
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from intervals_mcp_server.mcp_instance import mcp;"
+            "print(mcp._lowlevel_server.create_initialization_options().server_version)",
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert result.stdout.strip(), "serverInfo.version must not be empty"
