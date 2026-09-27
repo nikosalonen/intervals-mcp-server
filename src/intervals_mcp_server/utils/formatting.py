@@ -82,10 +82,10 @@ ID: {_fmt(activity.id)}
 Type: {_fmt(activity.type, "Unknown")}
 Date: {start_time}
 Description: {_fmt(activity.description)}
-Distance: {activity.distance or 0} meters
-Duration: {activity.elapsed_time or 0} seconds
+Distance: {_fmt(activity.distance)} meters
+Duration: {_fmt(activity.elapsed_time)} seconds
 Moving Time: {_fmt(activity.moving_time)} seconds
-Elevation Gain: {activity.total_elevation_gain or 0} meters
+Elevation Gain: {_fmt(activity.total_elevation_gain)} meters
 Elevation Loss: {_fmt(activity.total_elevation_loss)} meters
 
 Power Data:
@@ -156,7 +156,7 @@ Tags: {_fmt(", ".join(str(t) for t in workout.tags if t is not None) if workout.
 Indoor: {_fmt(workout.indoor)}
 Distance: {_fmt(workout.distance)}
 Color: {_fmt(workout.color)}
-Duration: {workout.moving_time or 0} seconds
+Duration: {_fmt(workout.moving_time)} seconds
 TSS: {_fmt(workout.icu_training_load)}
 """
 
@@ -264,7 +264,8 @@ def _format_sleep_recovery(entry: WellnessEntry) -> list[str]:
         sleep_lines.append(f"  Device Sleep Score: {entry.sleep_score}/100")
 
     if entry.readiness is not None:
-        sleep_lines.append(f"  Readiness: {entry.readiness}/10")
+        # Device-sourced (e.g. Oura, Whoop); the range depends on the device.
+        sleep_lines.append(f"  Readiness: {entry.readiness}")
 
     return sleep_lines
 
@@ -281,19 +282,42 @@ def _format_menstrual_tracking(entry: WellnessEntry) -> list[str]:
     return menstrual_lines
 
 
+# Intervals.icu stores subjective wellness as 1-4, where 1 is always the best state.
+# So the label strength runs the other way for some fields: motivation 1 = "Extreme",
+# but soreness 1 = "Low". Hydration has no published labels, so it gets a scale hint.
+_LEVEL_LABELS = {1: "Low", 2: "Avg", 3: "High", 4: "Extreme"}
+_MOOD_LABELS = {1: "Great", 2: "Good", 3: "OK", 4: "Grumpy"}
+_MOTIVATION_LABELS = {1: "Extreme", 2: "High", 3: "Avg", 4: "Low"}
+_INJURY_LABELS = {1: "Excellent", 2: "Niggle", 3: "Poor", 4: "Injured"}
+_ONE_TO_FOUR_HINT = "1-4, 1 = best"
+
+
+def _fmt_scale(value: Any, labels: dict[int, str] | None = None) -> str:
+    """Format a wellness value with its label, or with a scale hint if unlabelled.
+
+    A value outside 1-4 prints bare, because neither a label nor the hint fits it.
+    """
+    if labels is not None:
+        label = labels.get(value)
+        return f"{value} ({label})" if label else str(value)
+    if value in (1, 2, 3, 4):
+        return f"{value} ({_ONE_TO_FOUR_HINT})"
+    return str(value)
+
+
 def _format_subjective_feelings(entry: WellnessEntry) -> list[str]:
     """Format subjective feelings section."""
     subjective_lines = []
-    for value, label in [
-        (entry.soreness, "Soreness"),
-        (entry.fatigue, "Fatigue"),
-        (entry.stress, "Stress"),
-        (entry.mood, "Mood"),
-        (entry.motivation, "Motivation"),
-        (entry.injury, "Injury Level"),
+    for value, label, labels in [
+        (entry.soreness, "Soreness", _LEVEL_LABELS),
+        (entry.fatigue, "Fatigue", _LEVEL_LABELS),
+        (entry.stress, "Stress", _LEVEL_LABELS),
+        (entry.mood, "Mood", _MOOD_LABELS),
+        (entry.motivation, "Motivation", _MOTIVATION_LABELS),
+        (entry.injury, "Injury Level", _INJURY_LABELS),
     ]:
         if value is not None:
-            subjective_lines.append(f"  {label}: {value}/10")
+            subjective_lines.append(f"  {label}: {_fmt_scale(value, labels)}")
     return subjective_lines
 
 
@@ -311,7 +335,7 @@ def _format_nutrition_hydration(entry: WellnessEntry) -> list[str]:
             nutrition_lines.append(f"- {label}: {value}{suffix}")
 
     if entry.hydration is not None:
-        nutrition_lines.append(f"  Hydration Score: {entry.hydration}/10")
+        nutrition_lines.append(f"  Hydration Score: {_fmt_scale(entry.hydration)}")
 
     return nutrition_lines
 
@@ -445,7 +469,7 @@ Color: {_fmt(event.color)}"""
 Workout Information:
 Workout ID: {_fmt(workout.id)}
 Sport: {_fmt(workout.type, "Unknown")}
-Duration: {workout.moving_time or 0} seconds
+Duration: {_fmt(workout.moving_time)} seconds
 TSS: {_fmt(workout.icu_training_load)}"""
 
         if workout.intervals:
@@ -641,7 +665,7 @@ def format_search_result(result: Activity) -> str:
     tags_str = ", ".join(str(t) for t in result.tags if t is not None) if result.tags else "none"
     return (
         f"ID: {_fmt(result.id)} | {_fmt(result.name, 'Unnamed')} | "
-        f"{start} | {_fmt(result.type)} | {result.distance or 0} m | Tags: {tags_str}"
+        f"{start} | {_fmt(result.type)} | {_fmt(result.distance)} m | Tags: {tags_str}"
     )
 
 
@@ -679,42 +703,42 @@ def format_intervals(intervals_data: IntervalsData) -> str:
             itype = interval.type or "Unknown"
             parts.append(
                 f"[{i}] {label} ({itype})\n"
-                f"Duration: {interval.elapsed_time or 0} seconds (moving: {interval.moving_time or 0} seconds)\n"
-                f"Distance: {interval.distance or 0} meters\n"
-                f"Start-End Indices: {interval.start_index or 0}-{interval.end_index or 0}\n"
+                f"Duration: {_fmt(interval.elapsed_time)} seconds (moving: {_fmt(interval.moving_time)} seconds)\n"
+                f"Distance: {_fmt(interval.distance)} meters\n"
+                f"Start-End Indices: {_fmt(interval.start_index)}-{_fmt(interval.end_index)}\n"
                 f"\nPower Metrics:\n"
-                f"  Average Power: {interval.average_watts or 0} watts ({interval.average_watts_kg or 0} W/kg)\n"
-                f"  Max Power: {interval.max_watts or 0} watts ({interval.max_watts_kg or 0} W/kg)\n"
-                f"  Weighted Avg Power: {interval.weighted_average_watts or 0} watts\n"
-                f"  Intensity: {interval.intensity or 0}\n"
-                f"  Training Load: {interval.training_load or 0}\n"
-                f"  Joules: {interval.joules or 0}\n"
-                f"  Joules > FTP: {interval.joules_above_ftp or 0}\n"
-                f"  Power Zone: {_fmt(interval.zone)} ({interval.zone_min_watts or 0}-{interval.zone_max_watts or 0} watts)\n"
-                f"  W' Balance: Start {interval.wbal_start or 0}, End {interval.wbal_end or 0}\n"
-                f"  L/R Balance: {interval.avg_lr_balance or 0}\n"
-                f"  Variability: {interval.w5s_variability or 0}\n"
-                f"  Torque: Avg {interval.average_torque or 0}, Min {interval.min_torque or 0}, Max {interval.max_torque or 0}\n"
+                f"  Average Power: {_fmt(interval.average_watts)} watts ({_fmt(interval.average_watts_kg)} W/kg)\n"
+                f"  Max Power: {_fmt(interval.max_watts)} watts ({_fmt(interval.max_watts_kg)} W/kg)\n"
+                f"  Weighted Avg Power: {_fmt(interval.weighted_average_watts)} watts\n"
+                f"  Intensity: {_fmt(interval.intensity)}\n"
+                f"  Training Load: {_fmt(interval.training_load)}\n"
+                f"  Joules: {_fmt(interval.joules)}\n"
+                f"  Joules > FTP: {_fmt(interval.joules_above_ftp)}\n"
+                f"  Power Zone: {_fmt(interval.zone)} ({_fmt(interval.zone_min_watts)}-{_fmt(interval.zone_max_watts)} watts)\n"
+                f"  W' Balance: Start {_fmt(interval.wbal_start)}, End {_fmt(interval.wbal_end)}\n"
+                f"  L/R Balance: {_fmt(interval.avg_lr_balance)}\n"
+                f"  Variability: {_fmt(interval.w5s_variability)}\n"
+                f"  Torque: Avg {_fmt(interval.average_torque)}, Min {_fmt(interval.min_torque)}, Max {_fmt(interval.max_torque)}\n"
                 f"\nHeart Rate & Metabolic:\n"
-                f"  Heart Rate: Avg {interval.average_heartrate or 0}, Min {interval.min_heartrate or 0}, Max {interval.max_heartrate or 0} bpm\n"
-                f"  Decoupling: {interval.decoupling or 0}\n"
-                f"  DFA α1: {interval.average_dfa_a1 or 0}\n"
-                f"  Respiration: {interval.average_respiration or 0} breaths/min\n"
-                f"  EPOC: {interval.average_epoc or 0}\n"
-                f"  SmO2: {interval.average_smo2 or 0}% / {interval.average_smo2_2 or 0}%\n"
-                f"  THb: {interval.average_thb or 0} / {interval.average_thb_2 or 0}\n"
+                f"  Heart Rate: Avg {_fmt(interval.average_heartrate)}, Min {_fmt(interval.min_heartrate)}, Max {_fmt(interval.max_heartrate)} bpm\n"
+                f"  Decoupling: {_fmt(interval.decoupling)}\n"
+                f"  DFA α1: {_fmt(interval.average_dfa_a1)}\n"
+                f"  Respiration: {_fmt(interval.average_respiration)} breaths/min\n"
+                f"  EPOC: {_fmt(interval.average_epoc)}\n"
+                f"  SmO2: {_fmt(interval.average_smo2)}% / {_fmt(interval.average_smo2_2)}%\n"
+                f"  THb: {_fmt(interval.average_thb)} / {_fmt(interval.average_thb_2)}\n"
                 f"\nSpeed & Cadence:\n"
-                f"  Speed: Avg {interval.average_speed or 0}, Min {interval.min_speed or 0}, Max {interval.max_speed or 0} m/s\n"
-                f"  GAP: {interval.gap or 0} m/s\n"
-                f"  Cadence: Avg {interval.average_cadence or 0}, Min {interval.min_cadence or 0}, Max {interval.max_cadence or 0} rpm\n"
-                f"  Stride: {interval.average_stride or 0}\n"
+                f"  Speed: Avg {_fmt(interval.average_speed)}, Min {_fmt(interval.min_speed)}, Max {_fmt(interval.max_speed)} m/s\n"
+                f"  GAP: {_fmt(interval.gap)} m/s\n"
+                f"  Cadence: Avg {_fmt(interval.average_cadence)}, Min {_fmt(interval.min_cadence)}, Max {_fmt(interval.max_cadence)} rpm\n"
+                f"  Stride: {_fmt(interval.average_stride)}\n"
                 f"\nElevation & Environment:\n"
-                f"  Elevation Gain: {interval.total_elevation_gain or 0} meters\n"
-                f"  Altitude: Min {interval.min_altitude or 0}, Max {interval.max_altitude or 0} meters\n"
-                f"  Gradient: {interval.average_gradient or 0}%\n"
-                f"  Temperature: {interval.average_temp or 0}°C (Weather: {interval.average_weather_temp or 0}°C, Feels like: {interval.average_feels_like or 0}°C)\n"
-                f"  Wind: Speed {interval.average_wind_speed or 0} km/h, Gust {interval.average_wind_gust or 0} km/h, Direction {interval.prevailing_wind_deg or 0}°\n"
-                f"  Headwind: {interval.headwind_percent or 0}%, Tailwind: {interval.tailwind_percent or 0}%\n\n"
+                f"  Elevation Gain: {_fmt(interval.total_elevation_gain)} meters\n"
+                f"  Altitude: Min {_fmt(interval.min_altitude)}, Max {_fmt(interval.max_altitude)} meters\n"
+                f"  Gradient: {_fmt(interval.average_gradient)}%\n"
+                f"  Temperature: {_fmt(interval.average_temp)}°C (Weather: {_fmt(interval.average_weather_temp)}°C, Feels like: {_fmt(interval.average_feels_like)}°C)\n"
+                f"  Wind: Speed {_fmt(interval.average_wind_speed)} km/h, Gust {_fmt(interval.average_wind_gust)} km/h, Direction {_fmt(interval.prevailing_wind_deg)}°\n"
+                f"  Headwind: {_fmt(interval.headwind_percent)}%, Tailwind: {_fmt(interval.tailwind_percent)}%\n\n"
             )
 
     if intervals_data.icu_groups:
@@ -722,15 +746,15 @@ def format_intervals(intervals_data: IntervalsData) -> str:
 
         for i, group in enumerate(intervals_data.icu_groups, 1):
             parts.append(
-                f"Group: {_fmt(group.id, f'Group {i}')} (Contains {group.count or 0} intervals)\n"
-                f"Duration: {group.elapsed_time or 0} seconds (moving: {group.moving_time or 0} seconds)\n"
-                f"Distance: {group.distance or 0} meters\n"
-                f"Start-End Indices: {group.start_index or 0}-N/A\n\n"
-                f"Power: Avg {group.average_watts or 0} watts ({group.average_watts_kg or 0} W/kg), Max {group.max_watts or 0} watts\n"
-                f"W. Avg Power: {group.weighted_average_watts or 0} watts, Intensity: {group.intensity or 0}\n"
-                f"Heart Rate: Avg {group.average_heartrate or 0}, Max {group.max_heartrate or 0} bpm\n"
-                f"Speed: Avg {group.average_speed or 0}, Max {group.max_speed or 0} m/s\n"
-                f"Cadence: Avg {group.average_cadence or 0}, Max {group.max_cadence or 0} rpm\n\n"
+                f"Group: {_fmt(group.id, f'Group {i}')} (Contains {_fmt(group.count)} intervals)\n"
+                f"Duration: {_fmt(group.elapsed_time)} seconds (moving: {_fmt(group.moving_time)} seconds)\n"
+                f"Distance: {_fmt(group.distance)} meters\n"
+                f"Start-End Indices: {_fmt(group.start_index)}-N/A\n\n"
+                f"Power: Avg {_fmt(group.average_watts)} watts ({_fmt(group.average_watts_kg)} W/kg), Max {_fmt(group.max_watts)} watts\n"
+                f"W. Avg Power: {_fmt(group.weighted_average_watts)} watts, Intensity: {_fmt(group.intensity)}\n"
+                f"Heart Rate: Avg {_fmt(group.average_heartrate)}, Max {_fmt(group.max_heartrate)} bpm\n"
+                f"Speed: Avg {_fmt(group.average_speed)}, Max {_fmt(group.max_speed)} m/s\n"
+                f"Cadence: Avg {_fmt(group.average_cadence)}, Max {_fmt(group.max_cadence)} rpm\n\n"
             )
 
     return "".join(parts)

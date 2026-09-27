@@ -363,6 +363,50 @@ def test_format_intervals():
     assert "Rep 1" in result
 
 
+def test_format_intervals_missing_metrics_show_na_not_zero():
+    """A run without a power meter must not report 0 watts; real zeros stay 0."""
+    data = IntervalsData.from_dict(
+        {"id": "a1", "icu_intervals": [{"label": "Run", "moving_time": 0, "distance": 1000}]}
+    )
+    result = format_intervals(data)
+    assert "Average Power: N/A watts" in result
+    assert "0 watts" not in result
+    assert "moving: 0 seconds" in result
+    assert "Distance: 1000 meters" in result
+
+
+def test_format_interval_groups_missing_metrics_show_na():
+    """Interval group fields also show N/A for missing values instead of 0."""
+    data = IntervalsData.from_dict({"id": "a1", "icu_groups": [{"id": "g1", "count": 3}]})
+    result = format_intervals(data)
+    assert "Contains 3 intervals" in result
+    assert "Power: Avg N/A watts" in result
+    assert "Heart Rate: Avg N/A, Max N/A bpm" in result
+
+
+def test_format_activity_summary_missing_metrics_show_na_not_zero():
+    """Missing distance, duration and elevation show N/A; a real 0 distance stays 0."""
+    missing = format_activity_summary(Activity.from_dict({"id": "a1", "name": "Yoga"}))
+    assert "Distance: N/A meters" in missing
+    assert "Duration: N/A seconds" in missing
+    assert "Elevation Gain: N/A meters" in missing
+
+    zero = format_activity_summary(Activity.from_dict({"id": "a2", "name": "Trainer", "distance": 0}))
+    assert "Distance: 0 meters" in zero
+
+
+def test_format_workout_missing_duration_shows_na():
+    """A workout with no moving_time shows N/A, not 0 seconds."""
+    result = format_workout(Workout.from_dict({"id": 1, "name": "Endurance"}))
+    assert "Duration: N/A seconds" in result
+
+
+def test_format_search_result_missing_distance_shows_na():
+    """A search result with no distance shows N/A m, not 0 m."""
+    result = format_search_result(Activity.from_dict({"id": "a1", "name": "Swim"}))
+    assert "| N/A m |" in result
+
+
 # ── _fmt() helper tests ──────────────────────────────────────────────────
 
 
@@ -566,12 +610,13 @@ def test_format_wellness_entry_rich():
         readiness=8.5,
         menstrual_phase="FOLLICULAR",
         soreness=3,
-        fatigue=5,
+        fatigue=2,
         stress=4,
-        mood=7,
-        motivation=8,
+        mood=1,
+        motivation=1,
+        injury=1,
         kcal_consumed=2500,
-        hydration=7,
+        hydration=2,
         systolic=120,
         diastolic=80,
         steps=10000,
@@ -587,13 +632,29 @@ def test_format_wellness_entry_rich():
     assert "Sleep: 8.00 hours" in result
     assert "Sleep Quality: 2 (Good)" in result
     assert "Device Sleep Score: 85.0/100" in result
-    assert "Readiness: 8.5/10" in result
+    assert "Readiness: 8.5" in result
+    assert "8.5/10" not in result
     assert "Menstrual Phase: Follicular" in result
-    assert "Soreness: 3/10" in result
-    assert "Fatigue: 5/10" in result
+    assert "Soreness: 3 (High)" in result
+    assert "Fatigue: 2 (Avg)" in result
+    assert "Stress: 4 (Extreme)" in result
+    assert "Mood: 1 (Great)" in result
+    assert "Motivation: 1 (Extreme)" in result
+    assert "Injury Level: 1 (Excellent)" in result
     assert "Blood Pressure: 120/80 mmHg" in result
     assert "Calories Consumed: 2500" in result
-    assert "Hydration Score: 7/10" in result
+    assert "Hydration Score: 2 (1-4, 1 = best)" in result
     assert "Steps: 10000" in result
     assert "Comments: Good day" in result
     assert "Status: Locked" in result
+
+
+def test_format_wellness_entry_out_of_range_values_print_bare():
+    """A value outside 1-4 gets neither a label nor the 1-4 scale hint."""
+    entry = WellnessEntry(id="2024-06-01", soreness=5, injury=0, hydration=7)
+    result = format_wellness_entry(entry)
+    assert "Soreness: 5\n" in result
+    assert "Injury Level: 0\n" in result
+    assert "Hydration Score: 7\n" in result
+    assert "None" not in result
+    assert "1 = best" not in result

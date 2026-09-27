@@ -96,6 +96,30 @@ def test_get_activities(monkeypatch):
     assert "Activities:" in result
 
 
+def test_get_activities_does_not_fetch_outside_requested_range(monkeypatch):
+    """Too few named activities must not trigger a fetch from before `oldest`."""
+    unnamed = {"id": 1, "name": "Unnamed", "type": "Ride", "distance": 1000}
+    named = {"id": 2, "name": "Tempo Run", "type": "Run", "distance": 5000}
+    calls: list[dict] = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs.get("params", {}))
+        return [unnamed, named]
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.activities.make_intervals_request", fake_request
+    )
+    result = asyncio.run(
+        get_activities(athlete_id="i1", oldest="2024-09-01", newest="2024-09-07", limit=5)
+    )
+    assert "Tempo Run" in result
+    assert "Unnamed" not in result
+    assert len(calls) == 1
+    assert calls[0]["oldest"] == "2024-09-01"
+    assert calls[0]["newest"] == "2024-09-07"
+
+
 def test_get_activity_details(monkeypatch):
     """
     Test get_activity_details returns a formatted string with the activity name and details.
@@ -370,6 +394,85 @@ def test_delete_events_by_date_range_with_oldest_newest(monkeypatch):
     assert captured_params["newest"] == "2024-01-02"
 
 
+@pytest.mark.parametrize(
+    ("oldest", "newest"),
+    [("2024/01/01", "2024-01-02"), ("2024-01-01", "2024/01/02")],
+    ids=["bad-oldest", "bad-newest"],
+)
+def test_delete_events_by_date_range_rejects_invalid_date(monkeypatch, oldest, newest):
+    """A malformed date returns an error string instead of raising, and deletes nothing."""
+    calls = _capture_event_requests(monkeypatch)
+    result = asyncio.run(
+        delete_events_by_date_range(athlete_id="i1", oldest=oldest, newest=newest)
+    )
+    assert result.startswith("Error:")
+    assert not calls
+
+
+def test_delete_events_by_date_range_rejects_reversed_range(monkeypatch):
+    """oldest after newest returns an error before any request, even without zero padding."""
+    calls = _capture_event_requests(monkeypatch)
+    result = asyncio.run(
+        delete_events_by_date_range(athlete_id="i1", oldest="2024-10-01", newest="2024-9-30")
+    )
+    assert result.startswith("Error:")
+    assert "after" in result
+    assert not calls
+
+
+def test_delete_events_by_date_range_accepts_unpadded_forward_range(monkeypatch):
+    """A forward range must not be rejected just because a date is not zero-padded."""
+    calls = _capture_event_requests(monkeypatch)
+    asyncio.run(
+        delete_events_by_date_range(athlete_id="i1", oldest="2024-9-01", newest="2024-10-01")
+    )
+    assert calls
+
+
+def test_delete_events_by_date_range_errors_on_non_list_listing(monkeypatch):
+    """A listing that is not a list is an error, not 'Deleted 0 events'."""
+    calls: list[dict] = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        return {}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.events.make_intervals_request", fake_request)
+
+    result = asyncio.run(
+        delete_events_by_date_range(athlete_id="i1", oldest="2024-01-01", newest="2024-01-31")
+    )
+    assert result.startswith("Error deleting events")
+    assert "Deleted" not in result
+    assert not any(c.get("method") == "DELETE" for c in calls)
+
+
+def test_delete_events_by_date_range_reports_failures_only_when_present(monkeypatch):
+    """The summary lists failed IDs, and omits the failure clause when all deletes succeed."""
+    events = [{"id": "e1"}, {"id": "e2"}]
+
+    async def fake_request(*_args, **kwargs):
+        if kwargs.get("method") == "DELETE":
+            if kwargs["url"].endswith("/e2"):
+                return {"error": True, "message": "404 Not Found"}
+            return {}
+        return events
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.events.make_intervals_request", fake_request)
+    result = asyncio.run(
+        delete_events_by_date_range(athlete_id="i1", oldest="2024-01-01", newest="2024-01-02")
+    )
+    assert result == "Deleted 1 events. Failed to delete 1 events: e2 (404 Not Found)"
+
+    events = [{"id": "e1"}]
+    result = asyncio.run(
+        delete_events_by_date_range(athlete_id="i1", oldest="2024-01-01", newest="2024-01-02")
+    )
+    assert result == "Deleted 1 events."
+
+
 def test_get_event_by_id(monkeypatch):
     """
     Test get_event_by_id returns a formatted string with event details for a given event ID.
@@ -580,6 +683,76 @@ def test_update_event_without_start_date_preserves_existing_date(monkeypatch):
     assert "Successfully updated event:" in result
     # The payload sent to the API should NOT contain start_date_local
     assert "start_date_local" not in captured_kwargs.get("data", {})
+
+
+def _capture_event_requests(monkeypatch) -> list[dict]:
+    """Patch make_intervals_request in the events module and record each call's kwargs."""
+    calls: list[dict] = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        return {"id": "e1", "name": "Event", "category": "NOTE"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.events.make_intervals_request", fake_request)
+    return calls
+
+
+def test_update_event_without_category_preserves_existing_category(monkeypatch):
+    """Updating a NOTE or race without passing category must not turn it into a WORKOUT."""
+    calls = _capture_event_requests(monkeypatch)
+    asyncio.run(
+        add_or_update_event(athlete_id="i1", event_id="e1", name="Renamed", workout_type="Run")
+    )
+    assert calls[0]["method"] == "PUT"
+    assert "category" not in calls[0]["data"]
+
+
+def test_create_event_defaults_category_to_workout(monkeypatch):
+    """New events still default to category WORKOUT."""
+    calls = _capture_event_requests(monkeypatch)
+    asyncio.run(add_or_update_event(athlete_id="i1", name="Intervals", workout_type="Ride"))
+    assert calls[0]["method"] == "POST"
+    assert calls[0]["data"]["category"] == "WORKOUT"
+
+
+def test_update_event_with_explicit_category_sends_it(monkeypatch):
+    """An update that passes category still sends it."""
+    calls = _capture_event_requests(monkeypatch)
+    asyncio.run(
+        add_or_update_event(
+            athlete_id="i1", event_id="e1", name="A race", workout_type="Run", category="RACE_A"
+        )
+    )
+    assert calls[0]["method"] == "PUT"
+    assert calls[0]["data"]["category"] == "RACE_A"
+
+
+def test_update_event_with_empty_strings_omits_date_and_category(monkeypatch):
+    """Empty start_date and category on update are left out, not sent as blank values."""
+    calls = _capture_event_requests(monkeypatch)
+    result = asyncio.run(
+        add_or_update_event(
+            athlete_id="i1", event_id="e1", name="Renamed", workout_type="Run",
+            start_date="", category="",
+        )
+    )
+    assert not result.startswith("Error")
+    assert "start_date_local" not in calls[0]["data"]
+    assert "category" not in calls[0]["data"]
+
+
+def test_add_or_update_event_rejects_invalid_start_date(monkeypatch):
+    """A malformed start_date returns an error string and makes no API call."""
+    calls = _capture_event_requests(monkeypatch)
+    result = asyncio.run(
+        add_or_update_event(
+            athlete_id="i1", name="Intervals", workout_type="Ride", start_date="2024/03/15"
+        )
+    )
+    assert result.startswith("Error:")
+    assert "YYYY-MM-DD" in result
+    assert not calls
 
 
 def test_create_bulk_events(monkeypatch):
@@ -1869,8 +2042,8 @@ def test_update_season(monkeypatch):
     assert "Base" in result
 
 
-def test_update_season_error(monkeypatch):
-    """Update season returns error message on API error."""
+def test_update_season_lookup_error(monkeypatch):
+    """Update season returns error message when fetching the existing season fails."""
 
     async def fake_request(*_args, **_kwargs):
         return {"error": True, "message": "Not found"}
@@ -1878,9 +2051,113 @@ def test_update_season_error(monkeypatch):
     monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
     monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
 
-    result = asyncio.run(update_season(event_id="9999", athlete_id="i1"))
+    result = asyncio.run(update_season(event_id="9999", name="Base", athlete_id="i1"))
     assert "Error updating season" in result
     assert "Not found" in result
+
+
+def test_update_season_put_error(monkeypatch):
+    """Update season reports a failed PUT instead of claiming success."""
+    calls: list[dict] = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        if kwargs.get("method") == "PUT":
+            return {"error": True, "message": "422 Unprocessable Entity: bad field"}
+        return SINGLE_SEASON_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_season(event_id="1001", name="Base", athlete_id="i1"))
+    assert any(c.get("method") == "PUT" for c in calls)
+    assert "Error updating season" in result
+    assert "422" in result
+    assert "successfully" not in result
+
+
+def test_update_season_refuses_non_season_event(monkeypatch):
+    """update_season must not PUT to an event that is not a SEASON_START."""
+    calls: list[dict] = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        return {"id": 42, "category": "WORKOUT", "name": "Intervals"}
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_season(event_id="42", name="Build", athlete_id="i1"))
+    assert "is not a season" in result
+    assert "WORKOUT" in result
+    assert all(c.get("method", "GET") == "GET" for c in calls)
+
+
+def test_update_season_does_not_send_category(monkeypatch):
+    """The PUT payload carries only the fields the caller changed."""
+    calls: list[dict] = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        return SINGLE_SEASON_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    asyncio.run(update_season(event_id="1001", name="Base 2", athlete_id="i1"))
+    put = next(c for c in calls if c.get("method") == "PUT")
+    assert put["data"] == {"name": "Base 2"}
+
+
+def test_update_season_requires_a_field(monkeypatch):
+    """update_season with nothing to change returns an error and makes no API call."""
+    calls: list[dict] = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        return SINGLE_SEASON_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_season(event_id="1001", athlete_id="i1"))
+    assert result == "Error: Provide at least one field to update."
+    assert not calls
+
+
+def test_update_season_refuses_non_dict_lookup(monkeypatch):
+    """A GET that does not return an event object blocks the PUT."""
+    calls: list[dict] = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        return []
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    result = asyncio.run(update_season(event_id="1001", name="Base", athlete_id="i1"))
+    assert "is not a season" in result
+    assert "unknown" in result
+    assert not any(c.get("method") == "PUT" for c in calls)
+
+
+def test_season_tools_reject_invalid_dates(monkeypatch):
+    """create_season and update_season return an error for malformed dates, without API calls."""
+    calls: list[dict] = []
+
+    async def fake_request(*_args, **kwargs):
+        calls.append(kwargs)
+        return SINGLE_SEASON_DATA
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_request)
+    monkeypatch.setattr("intervals_mcp_server.tools.seasons.make_intervals_request", fake_request)
+
+    created = asyncio.run(create_season(name="Base", start_date="01/01/2026", athlete_id="i1"))
+    updated = asyncio.run(update_season(event_id="1001", end_date="2026-13-01", athlete_id="i1"))
+    assert created.startswith("Error:")
+    assert updated.startswith("Error:")
+    assert not calls
 
 
 def test_update_sport_settings(monkeypatch):

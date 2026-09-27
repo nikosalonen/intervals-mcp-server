@@ -50,24 +50,25 @@ def _prepare_event_data(  # pylint: disable=too-many-arguments,too-many-position
     distance: int | None,
     description: str | None = None,
     color: str | None = None,
-    category: str = "WORKOUT",
+    category: str | None = None,
     for_week: bool | None = None,
     show_as_note: bool | None = None,
 ) -> dict[str, Any]:
     """Prepare event data dictionary for API request.
 
     Many arguments are required to match the Intervals.icu API event structure.
-    When start_date is None (update without explicit date), start_date_local is omitted
-    so the API preserves the existing event date.
+    When start_date or category is None or empty (an update that leaves them out), the
+    key is omitted so the API keeps the event's existing value.
     """
     resolved_workout_type = _resolve_workout_type(name, workout_type)
     resolved_description = description if description is not None else (str(workout_doc) if workout_doc else None)
     data: dict[str, Any] = {
-        "category": category,
         "name": name,
         "type": resolved_workout_type,
     }
-    if start_date is not None:
+    if category:
+        data["category"] = category
+    if start_date:
         data["start_date_local"] = start_date + "T00:00:00"
     if resolved_description is not None:
         data["description"] = resolved_description
@@ -281,20 +282,23 @@ async def _fetch_events_for_deletion(
     Args:
         athlete_id: The athlete ID.
         api_key: Optional API key.
-        oldest: Oldest date in YYYY-MM-DD format.
-        newest: Newest date in YYYY-MM-DD format.
+        oldest: Oldest date in YYYY-MM-DD format, already validated by the caller.
+        newest: Newest date in YYYY-MM-DD format, already validated by the caller.
 
     Returns:
         Tuple of (events_list, error_message). error_message is None if successful.
     """
-    params = {"oldest": validate_date(oldest), "newest": validate_date(newest)}
+    params = {"oldest": oldest, "newest": newest}
     result = await make_intervals_request(
         url=f"/athlete/{athlete_id}/events", api_key=api_key, params=params
     )
     if isinstance(result, dict) and "error" in result:
         return [], f"Error deleting events: {result.get('message')}"
-    events = result if isinstance(result, list) else []
-    return events, None
+    # Anything but a list means the lookup failed; reporting "Deleted 0 events"
+    # would read as "nothing matched".
+    if not isinstance(result, list):
+        return [], "Error deleting events: unexpected response when listing events."
+    return result, None
 
 
 @mcp.tool()
@@ -306,6 +310,9 @@ async def delete_events_by_date_range(
 ) -> str:
     """Delete events for an athlete from Intervals.icu in the specified date range.
 
+    Deletes every calendar event in the range, whatever its category: workouts, notes,
+    races and seasons. An invalid or reversed date range returns an error and deletes nothing.
+
     Args:
         oldest: Oldest date in YYYY-MM-DD format
         newest: Newest date in YYYY-MM-DD format
@@ -316,6 +323,14 @@ async def delete_events_by_date_range(
     if error_msg:
         return error_msg
 
+    try:
+        validate_date(oldest)
+        validate_date(newest)
+    except ValueError as e:
+        return f"Error: {e}"
+    if datetime.strptime(oldest, "%Y-%m-%d") > datetime.strptime(newest, "%Y-%m-%d"):
+        return f"Error: oldest ({oldest}) is after newest ({newest})."
+
     events, error_msg = await _fetch_events_for_deletion(
         athlete_id_to_use, api_key, oldest, newest
     )
@@ -324,7 +339,10 @@ async def delete_events_by_date_range(
 
     failed_events = await _delete_events_list(athlete_id_to_use, api_key, events)
     deleted_count = len(events) - len(failed_events)
-    return f"Deleted {deleted_count} events. Failed to delete {len(failed_events)} events: {failed_events}"
+    summary = f"Deleted {deleted_count} events."
+    if failed_events:
+        summary += f" Failed to delete {len(failed_events)} events: {', '.join(failed_events)}"
+    return summary
 
 
 @mcp.tool()
@@ -340,12 +358,15 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
     moving_time: int | None = None,
     distance: int | None = None,
     color: str | None = None,
-    category: str = "WORKOUT",
+    category: str | None = None,
     for_week: bool | None = None,
     show_as_note: bool | None = None,
 ) -> str:
     """Post event for an athlete to Intervals.icu this follows the event api from intervals.icu
     If event_id is provided, the event will be updated instead of created.
+
+    On update, optional fields you leave out are not sent and keep their current values.
+    name and workout_type are required, so they always overwrite the event's name and type.
 
     Many arguments are required as this MCP tool function maps directly to the Intervals.icu API parameters.
 
@@ -353,7 +374,8 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
         athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         event_id: The Intervals.icu event ID (optional). If provided, the existing event is updated; if omitted, a new event is created.
-        start_date: Start date in YYYY-MM-DD format (optional, defaults to today)
+        start_date: Start date in YYYY-MM-DD format (optional, defaults to today for new events;
+            left unchanged on update)
         name: Name of the activity
         description: Workout description text in Intervals.icu format (optional). Supports Intervals.icu
             workout text syntax including custom zones (e.g. "- 10m CZZ2 HR"). If provided, takes
@@ -364,7 +386,8 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
         moving_time: Total expected moving time of the workout in seconds (optional)
         distance: Total expected distance of the workout in meters (optional)
         color: Event color as a hex string e.g. "#FF5733" (optional)
-        category: Event category (WORKOUT, NOTE, RACE_A, RACE_B, RACE_C, SEASON_START, etc.). Defaults to WORKOUT.
+        category: Event category (WORKOUT, NOTE, RACE_A, RACE_B, RACE_C, SEASON_START, etc.).
+            Defaults to WORKOUT for new events; left unchanged on update.
         for_week: When true, the event displays as a week-level note spanning the entire week in the
             calendar UI. Place on the Monday of the target week. Typically used with category=NOTE
             and show_as_note=true. (optional, default false)
@@ -424,12 +447,15 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
     if error_msg:
         return error_msg
 
-    # Only default start_date to today for new events, not updates.
-    # For updates without start_date, we omit it so the API preserves the existing date.
-    if not start_date and not event_id:
-        start_date = datetime.now().strftime("%Y-%m-%d")
+    # Only default start_date and category for new events. On updates, leaving them
+    # out of the payload lets the API keep the event's existing values.
+    if not event_id:
+        start_date = start_date or datetime.now().strftime("%Y-%m-%d")
+        category = category or "WORKOUT"
 
     try:
+        if start_date:
+            validate_date(start_date)
         event_data = _prepare_event_data(
             name, workout_type, start_date, workout_doc, moving_time, distance, description, color,
             category, for_week, show_as_note

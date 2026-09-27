@@ -12,6 +12,9 @@ import pathlib
 import sys
 from json import JSONDecodeError
 
+import httpx
+import pytest
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 os.environ.setdefault("API_KEY", "test")
 os.environ.setdefault("ATHLETE_ID", "i1")
@@ -99,3 +102,89 @@ def test_make_intervals_request_bad_json(monkeypatch, caplog):
 
     assert result["error"] is True
     assert "Invalid JSON in response" in result["message"]
+
+
+@pytest.fixture
+def use_mock_transport(monkeypatch):
+    """Route make_intervals_request through an httpx.MockTransport returning a fixed response.
+
+    Yields a function taking (status_code, body). The client is closed after the test.
+    """
+    clients: list[httpx.AsyncClient] = []
+
+    def _use(status_code: int, body: bytes) -> None:
+        transport = httpx.MockTransport(lambda _request: httpx.Response(status_code, content=body))
+        client = httpx.AsyncClient(transport=transport)
+        clients.append(client)
+        monkeypatch.setattr(server, "httpx_client", client)
+        monkeypatch.setattr(
+            api_client,
+            "get_config",
+            lambda: Config(
+                api_key="test",
+                athlete_id="i1",
+                intervals_api_base_url="https://intervals.icu/api/v1",
+                user_agent="test-agent",
+            ),
+        )
+
+    yield _use
+    for client in clients:
+        asyncio.run(client.aclose())
+
+
+@pytest.mark.parametrize(
+    ("status_code", "body", "expected"),
+    [
+        (401, b"Unauthorized", "401 Unauthorized: Please check your API key"),
+        (502, b"<html>Bad Gateway</html>", "502 Bad Gateway: Temporary upstream error; retry shortly."),
+        (
+            502,
+            b"upstream connect error",
+            "502 Bad Gateway: Temporary upstream error; retry shortly. Details: upstream connect error",
+        ),
+        (
+            422,
+            b'{"error": "start_date_local is required"}',
+            'Details: {"error": "start_date_local is required"}',
+        ),
+        (400, b"start_date_local is required", "400 Bad Request: start_date_local is required"),
+        (409, b"", "409 Conflict: Intervals.icu returned no readable error details."),
+        (520, b"<html>Unknown</html>", "520: Intervals.icu returned no readable error details."),
+    ],
+)
+def test_make_intervals_request_non_json_error_body_keeps_status(
+    use_mock_transport, status_code, body, expected
+):
+    """A non-JSON error body reports the HTTP status, not an 'Invalid JSON' error."""
+    use_mock_transport(status_code, body)
+
+    result = asyncio.run(server.make_intervals_request("/athlete/i1"))
+
+    assert isinstance(result, dict)
+    assert result["status_code"] == status_code
+    assert expected in result["message"]
+    assert "<html>" not in result["message"]
+
+
+def test_make_intervals_request_mapped_error_without_readable_body_has_no_details(
+    use_mock_transport,
+):
+    """A mapped status with an HTML body returns only the fixed message."""
+    use_mock_transport(504, b"<html>Gateway Timeout</html>")
+
+    result = asyncio.run(server.make_intervals_request("/athlete/i1"))
+
+    assert isinstance(result, dict)
+    assert result["message"] == "504 Gateway Timeout: Temporary upstream timeout; retry shortly."
+
+
+def test_make_intervals_request_truncates_long_error_body(use_mock_transport):
+    """A long plain-text error body is cut short instead of flooding the tool output."""
+    use_mock_transport(400, b"x" * 5000)
+
+    result = asyncio.run(server.make_intervals_request("/athlete/i1"))
+
+    assert isinstance(result, dict)
+    assert result["message"].startswith("400 Bad Request: xxx")
+    assert len(result["message"]) < 600

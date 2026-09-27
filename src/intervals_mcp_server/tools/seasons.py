@@ -14,10 +14,21 @@ from intervals_mcp_server.mcp_instance import mcp
 from intervals_mcp_server.utils.dates import get_default_start_date, get_default_future_end_date
 from intervals_mcp_server.utils.formatting import format_season_summary
 from intervals_mcp_server.utils.schemas import EventResponse
-from intervals_mcp_server.utils.validation import resolve_athlete_id
+from intervals_mcp_server.utils.validation import resolve_athlete_id, validate_date
 
 logger = logging.getLogger(__name__)
 config = get_config()
+
+
+def _validate_season_dates(start_date: str | None, end_date: str | None) -> str | None:
+    """Return an error message if a provided date is not YYYY-MM-DD, else None."""
+    try:
+        for value in (start_date, end_date):
+            if value is not None:
+                validate_date(value)
+    except ValueError as e:
+        return f"Error: {e}"
+    return None
 
 
 @mcp.tool()
@@ -107,6 +118,10 @@ async def create_season(
     if error_msg:
         return error_msg
 
+    date_error = _validate_season_dates(start_date, end_date)
+    if date_error:
+        return date_error
+
     event_data: dict[str, Any] = {
         "start_date_local": start_date + "T00:00:00",
         "category": "SEASON_START",
@@ -154,6 +169,10 @@ async def update_season(
 ) -> str:
     """Update an existing training season.
 
+    Provide at least one of name, start_date, end_date, description or color; only
+    those fields are changed. Refuses to edit an event that is not
+    a season (category SEASON_START); get season IDs from list_seasons.
+
     Args:
         event_id: The Intervals.icu event ID of the season to update
         athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
@@ -168,7 +187,11 @@ async def update_season(
     if error_msg:
         return error_msg
 
-    event_data: dict[str, Any] = {"category": "SEASON_START"}
+    date_error = _validate_season_dates(start_date, end_date)
+    if date_error:
+        return date_error
+
+    event_data: dict[str, Any] = {}
     if name is not None:
         event_data["name"] = name
     if start_date is not None:
@@ -180,8 +203,25 @@ async def update_season(
     if color is not None:
         event_data["color"] = color
 
+    if not event_data:
+        return "Error: Provide at least one field to update."
+
+    event_url = f"/athlete/{athlete_id_to_use}/events/{event_id}"
+
+    # Check the target really is a season, so a wrong event_id cannot silently
+    # edit a workout, note or race.
+    existing = await make_intervals_request(url=event_url, api_key=api_key)
+    if isinstance(existing, dict) and "error" in existing:
+        return f"Error updating season: {existing.get('message', 'Unknown error')}"
+    if not isinstance(existing, dict) or existing.get("category") != "SEASON_START":
+        category = existing.get("category") if isinstance(existing, dict) else None
+        return (
+            f"Error: event {event_id} is not a season (category: {category or 'unknown'}). "
+            "Use list_seasons to find season IDs."
+        )
+
     result = await make_intervals_request(
-        url=f"/athlete/{athlete_id_to_use}/events/{event_id}",
+        url=event_url,
         api_key=api_key,
         method="PUT",
         data=event_data,
