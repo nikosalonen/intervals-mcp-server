@@ -4,8 +4,10 @@ Configuration management for Intervals.icu MCP Server.
 This module handles loading and validation of configuration from environment variables.
 """
 
+import logging
 import os
 from dataclasses import dataclass
+from typing import Literal, cast
 
 from intervals_mcp_server.utils.validation import validate_athlete_id
 
@@ -17,6 +19,47 @@ try:
 except ImportError:
     # python-dotenv not installed, proceed without it
     pass
+
+logger = logging.getLogger("intervals_icu_mcp_server")
+
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+LOG_LEVELS: tuple[LogLevel, ...] = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+DEFAULT_LOG_LEVEL: LogLevel = "INFO"
+
+# Accepted by Python's own logging module, so operators reasonably expect them here.
+LOG_LEVEL_ALIASES: dict[str, LogLevel] = {"WARN": "WARNING", "FATAL": "CRITICAL"}
+
+
+def resolve_log_level() -> LogLevel:
+    """
+    Resolve the MCP server log level from FASTMCP_LOG_LEVEL.
+
+    Accepts any case, tolerates surrounding whitespace, and maps the aliases
+    WARN and FATAL. An unrecognised value degrades to INFO with a warning rather
+    than raising: `mcp_instance` builds the MCPServer at module level, so the
+    level has to be known at import time, and raising there would make a log
+    verbosity typo break every import path -- pytest collection included.
+
+    Returns:
+        LogLevel: The configured level, defaulting to INFO.
+    """
+    raw = os.getenv("FASTMCP_LOG_LEVEL")
+    if raw is None:
+        return DEFAULT_LOG_LEVEL
+
+    level = raw.strip().upper()
+    level = LOG_LEVEL_ALIASES.get(level, cast(LogLevel, level))
+
+    if level not in LOG_LEVELS:
+        logger.warning(
+            "Unsupported FASTMCP_LOG_LEVEL value %r; falling back to %s. Use one of: %s.",
+            raw,
+            DEFAULT_LOG_LEVEL,
+            ", ".join(LOG_LEVELS),
+        )
+        return DEFAULT_LOG_LEVEL
+
+    return cast(LogLevel, level)
 
 
 @dataclass

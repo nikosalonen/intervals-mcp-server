@@ -207,6 +207,35 @@ To start the server manually (useful when developing or testing), run:
 mcp run src/intervals_mcp_server/server.py
 ```
 
+This is the stdio path, and it is what the Dockerfile uses. Note that `mcp run`
+imports the module rather than executing it, so it bypasses the `__main__` block
+and therefore ignores `MCP_TRANSPORT`, `FASTMCP_HOST` and `FASTMCP_PORT`. To use a
+network transport with environment configuration, run the module directly:
+
+```bash
+python src/intervals_mcp_server/server.py
+```
+
+### Transport environment variables
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `MCP_TRANSPORT` | `stdio` | Also accepts `sse`, `http`, `streamable-http` (`http` is an alias for `streamable-http`). |
+| `FASTMCP_HOST` | `127.0.0.1` | Network transports only. |
+| `FASTMCP_PORT` | `8000` | Network transports only; must be a decimal integer in 1–65535. |
+| `FASTMCP_LOG_LEVEL` | `INFO` | `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL`, plus the `WARN` and `FATAL` aliases. An unrecognised value falls back to `INFO` with a warning. |
+
+> **Binding beyond localhost.** The MCP SDK auto-enables DNS-rebinding protection
+> only for loopback hosts. Setting `FASTMCP_HOST` to anything else (`0.0.0.0`, a
+> LAN address) turns that protection off, and this server ships no authentication
+> of its own — put it behind a proxy that terminates TLS and authenticates. The
+> server logs a warning when it binds beyond loopback. The bind URL is always
+> written to stderr regardless of `FASTMCP_LOG_LEVEL`.
+
+`MCP_SSE_MOUNT_PATH` is no longer supported: SDK v2 removed `run(mount_path=...)`.
+Setting it to a real sub-path fails at startup on the SSE transport rather than
+silently serving from the root. Serve under a sub-path with a reverse proxy instead.
+
 ## License
 
 The GNU General Public License v3.0

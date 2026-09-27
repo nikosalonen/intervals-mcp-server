@@ -42,17 +42,16 @@ from intervals_mcp_server.tools.workouts import (
 
 def register_tools(mcp_instance: MCPServer) -> None:
     """
-    Register all MCP tools with the MCPServer instance.
+    No-op retained for API compatibility; it is exported but has no callers.
 
-    This function imports all tool modules, which causes their @mcp.tool()
-    decorators to register the tools. The tools need access to the mcp instance,
-    so they will be imported after the mcp instance is created.
+    Registration is an import side effect, not something this function does: the
+    module-level imports above run each tool module's @mcp.tool() decorators
+    against the shared instance from mcp_instance.py. Importing this package is
+    therefore sufficient, and that is what server.py relies on.
 
     Args:
-        mcp_instance (MCPServer): The MCPServer instance to register tools with.
+        mcp_instance (MCPServer): Ignored. Kept so existing callers still work.
     """
-    # Tools are registered via decorators when modules are imported above
-    # The mcp_instance parameter is kept for future use if needed
     _ = mcp_instance
 
 
