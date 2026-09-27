@@ -1,10 +1,9 @@
 """
 MCP tools registry for Intervals.icu MCP Server.
 
-This module registers all available MCP tools with the MCPServer instance.
+Importing this package registers every tool: each module's @mcp.tool()
+decorators run against the shared instance from mcp_instance.py.
 """
-
-from mcp.server.mcpserver import MCPServer  # pylint: disable=import-error
 
 # Import all tools for re-export
 # Note: Tools register themselves via @mcp.tool() decorators when imported
@@ -40,23 +39,7 @@ from intervals_mcp_server.tools.workouts import (
 )
 
 
-def register_tools(mcp_instance: MCPServer) -> None:
-    """
-    No-op retained for API compatibility; it is exported but has no callers.
-
-    Registration is an import side effect, not something this function does: the
-    module-level imports above run each tool module's @mcp.tool() decorators
-    against the shared instance from mcp_instance.py. Importing this package is
-    therefore sufficient, and that is what server.py relies on.
-
-    Args:
-        mcp_instance (MCPServer): Ignored. Kept so existing callers still work.
-    """
-    _ = mcp_instance
-
-
 __all__ = [
-    "register_tools",
     "get_activities",
     "get_activity_details",
     "get_activity_intervals",

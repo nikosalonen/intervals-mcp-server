@@ -1,21 +1,8 @@
 """
 Tests for transport selection and server startup.
 
-These cover the FASTMCP_* wiring that lives in this project rather than the SDK.
-
-Contrary to appearances, this is not migration parity work. v1 declared an
-`env_prefix` of "FASTMCP_" on its Settings model but `FastMCP.__init__` then
-passed an explicit argument for every field, and init arguments outrank env
-sources in pydantic-settings -- so the prefix was decorative and none of these
-variables ever took effect. Verified against mcp==1.29.0, the version this
-project migrated from:
-
-    FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=9999 FASTMCP_LOG_LEVEL=DEBUG
-      -> settings.host='127.0.0.1'  settings.port=8000  settings.log_level='INFO'
-
-v2 drops the pretense and reads no environment at all, so `start_server` resolves
-these itself -- which makes the README SSE/ChatGPT instructions work for the
-first time. The tests below pin that behavior, not a restored status quo.
+These cover the FASTMCP_* wiring that lives in this project. The MCP SDK reads
+no environment of its own, so `start_server` has to resolve and forward it.
 """
 
 import inspect
@@ -133,6 +120,7 @@ def test_a_bad_log_level_does_not_break_importing_the_package(
         check=False,
     )
     assert result.returncode == 0, result.stderr
+    assert "FASTMCP_LOG_LEVEL" in result.stderr, "the fallback must be reported"
 
 
 # --- setup_transport ---------------------------------------------------
@@ -292,34 +280,50 @@ def test_surrounding_whitespace_is_stripped_from_host(monkeypatch: pytest.Monkey
     assert server.last["kwargs"]["host"] == "0.0.0.0"
 
 
-def test_binding_beyond_loopback_warns_that_protection_is_not_auto_enabled(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+def test_binding_beyond_loopback_warns_even_when_logging_is_silenced(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """
     The SDK auto-enables DNS-rebinding protection only for loopback hosts
     (`host in ("127.0.0.1", "localhost", "::1")`). This server ships no auth,
-    so a wider bind must not be silent.
+    so a wider bind must not be silent -- not even with FASTMCP_LOG_LEVEL=ERROR.
     """
     monkeypatch.setenv("FASTMCP_HOST", "0.0.0.0")
     server = RecordingServer()
 
-    with caplog.at_level(logging.WARNING, logger="intervals_icu_mcp_server"):
+    logger = logging.getLogger("intervals_icu_mcp_server")
+    original = logger.level
+    logger.setLevel(logging.CRITICAL)
+    try:
         start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+    finally:
+        logger.setLevel(original)
 
-    assert "0.0.0.0" in caplog.text
-    assert "rebinding" in caplog.text.lower()
+    err = capsys.readouterr().err
+    assert "0.0.0.0" in err
+    assert "rebinding" in err.lower()
 
 
+@pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1", "[::1]"])
 def test_loopback_bind_stays_quiet(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], host: str
 ) -> None:
-    monkeypatch.setenv("FASTMCP_HOST", "127.0.0.1")
+    monkeypatch.setenv("FASTMCP_HOST", host)
     server = RecordingServer()
 
-    with caplog.at_level(logging.WARNING, logger="intervals_icu_mcp_server"):
-        start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+    start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
 
-    assert "rebinding" not in caplog.text.lower()
+    assert "rebinding" not in capsys.readouterr().err.lower()
+
+
+def test_brackets_are_stripped_from_an_ipv6_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The socket layer rejects "[::1]" with an opaque gaierror."""
+    monkeypatch.setenv("FASTMCP_HOST", "[::1]")
+    server = RecordingServer()
+
+    start_server(server, TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert server.last["kwargs"]["host"] == "::1"
 
 
 @pytest.mark.parametrize("raw", ["80_80", "８０８０", "+80"])
@@ -366,6 +370,23 @@ def test_bind_url_is_announced_even_when_logging_is_silenced(
     assert expected_url in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(
+    ("host", "expected_url"),
+    [("::1", "http://[::1]:8000/sse"), ("[::1]", "http://[::1]:8000/sse"), ("::", "http://[::]:8000/sse")],
+)
+def test_ipv6_hosts_are_bracketed_in_the_announced_url(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    host: str,
+    expected_url: str,
+) -> None:
+    monkeypatch.setenv("FASTMCP_HOST", host)
+
+    start_server(RecordingServer(), TransportAliases.SSE)  # type: ignore[arg-type]
+
+    assert expected_url in capsys.readouterr().err
+
+
 # --- start_server: MCP_SSE_MOUNT_PATH ---------------------------------
 
 
@@ -400,20 +421,16 @@ def test_mount_paths_that_never_did_anything_are_treated_as_unset(
 
 
 def test_mount_path_only_warns_on_transports_that_never_read_it(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """
-    v1 read mount_path only in the SSE branch, so a stale .env line must not
-    newly refuse to start a streamable-http server that worked before.
-    """
+    """A stale .env line must not stop a streamable-http server from starting."""
     monkeypatch.setenv("MCP_SSE_MOUNT_PATH", "/intervals")
     server = RecordingServer()
 
-    with caplog.at_level(logging.WARNING, logger="intervals_icu_mcp_server"):
-        start_server(server, TransportAliases.STREAMABLE_HTTP)  # type: ignore[arg-type]
+    start_server(server, TransportAliases.STREAMABLE_HTTP)  # type: ignore[arg-type]
 
     assert server.last["kwargs"]["transport"] == "streamable-http"
-    assert "MCP_SSE_MOUNT_PATH" in caplog.text
+    assert "MCP_SSE_MOUNT_PATH" in capsys.readouterr().err
 
 
 def test_mount_path_is_ignored_for_stdio(monkeypatch: pytest.MonkeyPatch) -> None:
