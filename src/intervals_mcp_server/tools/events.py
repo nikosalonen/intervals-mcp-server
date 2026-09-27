@@ -138,7 +138,12 @@ async def get_events(
     oldest: str | None = None,
     newest: str | None = None,
 ) -> str:
-    """Get events for an athlete from Intervals.icu
+    """List Intervals.icu calendar events in a date range. Read-only.
+
+    Events are everything on the training calendar: planned workouts (WORKOUT),
+    notes (NOTE), week-level notes (for_week=true), races (RACE_A, RACE_B, RACE_C)
+    and season starts (SEASON_START). Returns a summary per event with its ID;
+    use get_event_by_id for workout and race details.
 
     Args:
         athlete_id: Do not provide — the server uses the pre-configured ATHLETE_ID automatically
@@ -202,7 +207,12 @@ async def get_event_by_id(
     athlete_id: str | None = None,
     api_key: str | None = None,
 ) -> str:
-    """Get detailed information for a specific event from Intervals.icu
+    """Get one Intervals.icu calendar event by ID. Read-only.
+
+    Works for any event category: planned workouts, notes, week-level notes and
+    races. Returns the description plus workout details (sport, duration, TSS,
+    interval count) and race details (priority, result) when present. Get event
+    IDs from get_events.
 
     Args:
         event_id: The Intervals.icu event ID
