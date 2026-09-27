@@ -169,7 +169,8 @@ async def update_season(
 ) -> str:
     """Update an existing training season.
 
-    Only the fields you provide are changed. Refuses to edit an event that is not
+    Provide at least one of name, start_date, end_date, description or color; only
+    those fields are changed. Refuses to edit an event that is not
     a season (category SEASON_START); get season IDs from list_seasons.
 
     Args:
@@ -208,7 +209,7 @@ async def update_season(
     event_url = f"/athlete/{athlete_id_to_use}/events/{event_id}"
 
     # Check the target really is a season, so a wrong event_id cannot silently
-    # edit (or convert) a workout, note or race.
+    # edit a workout, note or race.
     existing = await make_intervals_request(url=event_url, api_key=api_key)
     if isinstance(existing, dict) and "error" in existing:
         return f"Error updating season: {existing.get('message', 'Unknown error')}"

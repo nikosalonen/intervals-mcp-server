@@ -59,7 +59,7 @@ Usage:
 
 import logging
 
-# Import API client and configuration
+# Import API client
 from intervals_mcp_server.api.client import (
     httpx_client,  # Re-export for backward compatibility with tests
     make_intervals_request,

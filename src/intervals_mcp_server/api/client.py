@@ -81,8 +81,15 @@ async def setup_api_client(_app: MCPServer):
             pass
 
 
+_MAX_ERROR_DETAIL_CHARS = 500
+
+
 def _get_error_message(error_code: int, error_text: str) -> str:
-    """Return a user-friendly error message for a given HTTP status code."""
+    """Return a user-friendly error message for a given HTTP status code.
+
+    The message always starts with the status code, because tools show only the
+    message: without it the caller cannot tell a temporary 502 from a bad-input 400.
+    """
     error_messages = {
         HTTPStatus.UNAUTHORIZED: f"{HTTPStatus.UNAUTHORIZED.value} {HTTPStatus.UNAUTHORIZED.phrase}: Please check your API key.",
         HTTPStatus.FORBIDDEN: f"{HTTPStatus.FORBIDDEN.value} {HTTPStatus.FORBIDDEN.phrase}: You may not have permission to access this resource.",
@@ -90,13 +97,24 @@ def _get_error_message(error_code: int, error_text: str) -> str:
         HTTPStatus.UNPROCESSABLE_ENTITY: f"{HTTPStatus.UNPROCESSABLE_ENTITY.value} {HTTPStatus.UNPROCESSABLE_ENTITY.phrase}: The server couldn't process the request (invalid parameters or unsupported operation).",
         HTTPStatus.TOO_MANY_REQUESTS: f"{HTTPStatus.TOO_MANY_REQUESTS.value} {HTTPStatus.TOO_MANY_REQUESTS.phrase}: Too many requests in a short time period.",
         HTTPStatus.INTERNAL_SERVER_ERROR: f"{HTTPStatus.INTERNAL_SERVER_ERROR.value} {HTTPStatus.INTERNAL_SERVER_ERROR.phrase}: The Intervals.icu server encountered an internal error.",
+        HTTPStatus.BAD_GATEWAY: f"{HTTPStatus.BAD_GATEWAY.value} {HTTPStatus.BAD_GATEWAY.phrase}: Temporary upstream error; retry shortly.",
         HTTPStatus.SERVICE_UNAVAILABLE: f"{HTTPStatus.SERVICE_UNAVAILABLE.value} {HTTPStatus.SERVICE_UNAVAILABLE.phrase}: The Intervals.icu server might be down or undergoing maintenance.",
+        HTTPStatus.GATEWAY_TIMEOUT: f"{HTTPStatus.GATEWAY_TIMEOUT.value} {HTTPStatus.GATEWAY_TIMEOUT.phrase}: Temporary upstream timeout; retry shortly.",
     }
     try:
         status = HTTPStatus(error_code)
-        return error_messages.get(status, error_text)
     except ValueError:
-        return error_text
+        prefix = str(error_code)
+    else:
+        if status in error_messages:
+            return error_messages[status]
+        prefix = f"{status.value} {status.phrase}"
+
+    # An HTML page (proxy or CDN error) or an empty body tells the caller nothing.
+    detail = error_text.strip()
+    if not detail or detail.startswith("<"):
+        return f"{prefix}: Intervals.icu returned no readable error details."
+    return f"{prefix}: {detail[:_MAX_ERROR_DETAIL_CHARS]}"
 
 
 def _prepare_request_config(
@@ -135,14 +153,15 @@ def _prepare_request_config(
 def _parse_response(
     response: httpx.Response, full_url: str
 ) -> dict[str, Any] | list[dict[str, Any]]:
-    """Parse HTTP response and return JSON data or error dict.
+    """Parse a 2xx response as JSON.
 
     Returns:
-        Parsed JSON response or error dict.
+        Parsed JSON response, or an error dict if the body is not valid JSON.
 
     Raises:
-        httpx.HTTPStatusError: For 4xx/5xx responses. Checked before parsing so an
-            HTML or plain-text error body still reports its status code.
+        httpx.HTTPStatusError: For any non-2xx response (the client does not follow
+            redirects). Checked before parsing so an HTML or plain-text error body
+            still reports its status code.
     """
     response.raise_for_status()
     try:

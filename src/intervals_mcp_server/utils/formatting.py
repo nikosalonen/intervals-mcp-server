@@ -282,20 +282,27 @@ def _format_menstrual_tracking(entry: WellnessEntry) -> list[str]:
     return menstrual_lines
 
 
-# Intervals.icu stores subjective wellness on a 1-4 scale where 1 is the best
-# state, which reads backwards for some fields (motivation 1 = "Extreme").
+# Intervals.icu stores subjective wellness as 1-4, where 1 is always the best state.
+# So the label strength runs the other way for some fields: motivation 1 = "Extreme",
+# but soreness 1 = "Low". Hydration has no published labels, so it gets a scale hint.
 _LEVEL_LABELS = {1: "Low", 2: "Avg", 3: "High", 4: "Extreme"}
 _MOOD_LABELS = {1: "Great", 2: "Good", 3: "OK", 4: "Grumpy"}
 _MOTIVATION_LABELS = {1: "Extreme", 2: "High", 3: "Avg", 4: "Low"}
+_INJURY_LABELS = {1: "Excellent", 2: "Niggle", 3: "Poor", 4: "Injured"}
 _ONE_TO_FOUR_HINT = "1-4, 1 = best"
 
 
 def _fmt_scale(value: Any, labels: dict[int, str] | None = None) -> str:
-    """Format a 1-4 wellness value with its label, or with a scale hint if unlabelled."""
+    """Format a wellness value with its label, or with a scale hint if unlabelled.
+
+    A value outside 1-4 prints bare, because neither a label nor the hint fits it.
+    """
     if labels is not None:
         label = labels.get(value)
         return f"{value} ({label})" if label else str(value)
-    return f"{value} ({_ONE_TO_FOUR_HINT})"
+    if value in (1, 2, 3, 4):
+        return f"{value} ({_ONE_TO_FOUR_HINT})"
+    return str(value)
 
 
 def _format_subjective_feelings(entry: WellnessEntry) -> list[str]:
@@ -307,7 +314,7 @@ def _format_subjective_feelings(entry: WellnessEntry) -> list[str]:
         (entry.stress, "Stress", _LEVEL_LABELS),
         (entry.mood, "Mood", _MOOD_LABELS),
         (entry.motivation, "Motivation", _MOTIVATION_LABELS),
-        (entry.injury, "Injury Level", None),
+        (entry.injury, "Injury Level", _INJURY_LABELS),
     ]:
         if value is not None:
             subjective_lines.append(f"  {label}: {_fmt_scale(value, labels)}")

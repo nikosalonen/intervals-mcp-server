@@ -108,7 +108,9 @@ async def get_activities(  # pylint: disable=too-many-arguments,too-many-return-
         api_key: The Intervals.icu API key (optional, will use API_KEY from .env if not provided)
         oldest: Oldest date in YYYY-MM-DD format (optional, defaults to 30 days ago)
         newest: Newest date in YYYY-MM-DD format (optional, defaults to today)
-        limit: Maximum number of activities to return (optional, defaults to 10)
+        limit: Maximum number of activities to return (optional, defaults to 10). With
+            include_unnamed=False, fewer may be returned; results never come from outside
+            oldest..newest.
         include_unnamed: Whether to include unnamed activities (optional, defaults to False)
     """
     # Resolve athlete ID and date parameters
@@ -141,8 +143,8 @@ async def get_activities(  # pylint: disable=too-many-arguments,too-many-return-
     if not activities:
         return f"No valid activities found for athlete {athlete_id_to_use} in the specified date range."
 
-    # Stay inside the requested date range: if filtering leaves fewer than `limit`
-    # named activities, return what is there rather than reaching further back.
+    # Never fetch outside the requested range; with unnamed activities filtered out,
+    # fewer than `limit` may remain.
     if not include_unnamed:
         activities = _filter_named_activities(activities)
 
