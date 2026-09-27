@@ -12,6 +12,9 @@ import pathlib
 import sys
 from json import JSONDecodeError
 
+import httpx
+import pytest
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 os.environ.setdefault("API_KEY", "test")
 os.environ.setdefault("ATHLETE_ID", "i1")
@@ -99,3 +102,39 @@ def test_make_intervals_request_bad_json(monkeypatch, caplog):
 
     assert result["error"] is True
     assert "Invalid JSON in response" in result["message"]
+
+
+def _use_mock_transport(monkeypatch, status_code: int, body: bytes) -> None:
+    """Route make_intervals_request through an httpx.MockTransport returning a fixed response."""
+    transport = httpx.MockTransport(lambda _request: httpx.Response(status_code, content=body))
+    monkeypatch.setattr(server, "httpx_client", httpx.AsyncClient(transport=transport))
+    monkeypatch.setattr(
+        api_client,
+        "get_config",
+        lambda: Config(
+            api_key="test",
+            athlete_id="i1",
+            intervals_api_base_url="https://intervals.icu/api/v1",
+            user_agent="test-agent",
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("status_code", "body", "expected"),
+    [
+        (401, b"Unauthorized", "Please check your API key"),
+        (502, b"<html>Bad Gateway</html>", "<html>Bad Gateway</html>"),
+    ],
+)
+def test_make_intervals_request_non_json_error_body_keeps_status(
+    monkeypatch, status_code, body, expected
+):
+    """A non-JSON error body reports the HTTP status, not an 'Invalid JSON' error."""
+    _use_mock_transport(monkeypatch, status_code, body)
+
+    result = asyncio.run(server.make_intervals_request("/athlete/i1"))
+
+    assert isinstance(result, dict)
+    assert result["status_code"] == status_code
+    assert expected in result["message"]

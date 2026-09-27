@@ -363,6 +363,18 @@ def test_format_intervals():
     assert "Rep 1" in result
 
 
+def test_format_intervals_missing_metrics_show_na_not_zero():
+    """A run without a power meter must not report 0 watts; real zeros stay 0."""
+    data = IntervalsData.from_dict(
+        {"id": "a1", "icu_intervals": [{"label": "Run", "moving_time": 0, "distance": 1000}]}
+    )
+    result = format_intervals(data)
+    assert "Average Power: N/A watts" in result
+    assert "0 watts" not in result
+    assert "moving: 0 seconds" in result
+    assert "Distance: 1000 meters" in result
+
+
 # ── _fmt() helper tests ──────────────────────────────────────────────────
 
 
@@ -566,12 +578,13 @@ def test_format_wellness_entry_rich():
         readiness=8.5,
         menstrual_phase="FOLLICULAR",
         soreness=3,
-        fatigue=5,
+        fatigue=2,
         stress=4,
-        mood=7,
-        motivation=8,
+        mood=1,
+        motivation=1,
+        injury=1,
         kcal_consumed=2500,
-        hydration=7,
+        hydration=2,
         systolic=120,
         diastolic=80,
         steps=10000,
@@ -587,13 +600,18 @@ def test_format_wellness_entry_rich():
     assert "Sleep: 8.00 hours" in result
     assert "Sleep Quality: 2 (Good)" in result
     assert "Device Sleep Score: 85.0/100" in result
-    assert "Readiness: 8.5/10" in result
+    assert "Readiness: 8.5" in result
+    assert "8.5/10" not in result
     assert "Menstrual Phase: Follicular" in result
-    assert "Soreness: 3/10" in result
-    assert "Fatigue: 5/10" in result
+    assert "Soreness: 3 (High)" in result
+    assert "Fatigue: 2 (Avg)" in result
+    assert "Stress: 4 (Extreme)" in result
+    assert "Mood: 1 (Great)" in result
+    assert "Motivation: 1 (Extreme)" in result
+    assert "Injury Level: 1 (1-4, 1 = best)" in result
     assert "Blood Pressure: 120/80 mmHg" in result
     assert "Calories Consumed: 2500" in result
-    assert "Hydration Score: 7/10" in result
+    assert "Hydration Score: 2 (1-4, 1 = best)" in result
     assert "Steps: 10000" in result
     assert "Comments: Good day" in result
     assert "Status: Locked" in result

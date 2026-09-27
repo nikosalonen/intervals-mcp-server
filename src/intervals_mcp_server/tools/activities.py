@@ -6,7 +6,6 @@ This module contains tools for retrieving and managing athlete activities.
 
 import logging
 from dataclasses import replace
-from datetime import datetime, timedelta
 from typing import Any
 
 from intervals_mcp_server.api.client import make_intervals_request
@@ -48,36 +47,6 @@ def _filter_named_activities(activities: list[dict[str, Any]]) -> list[dict[str,
         for activity in activities
         if activity.get("name") and activity.get("name") != "Unnamed"
     ]
-
-
-async def _fetch_more_activities(
-    athlete_id: str,
-    oldest: str,
-    api_key: str | None,
-    api_limit: int,
-) -> list[dict[str, Any]]:
-    """Fetch additional activities from an earlier date range."""
-    oldest_date = datetime.fromisoformat(oldest)
-    older_start_date = (oldest_date - timedelta(days=60)).strftime("%Y-%m-%d")
-    older_end_date = (oldest_date - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    if older_start_date >= older_end_date:
-        return []
-
-    more_params = {
-        "oldest": older_start_date,
-        "newest": older_end_date,
-        "limit": api_limit,
-    }
-    more_result = await make_intervals_request(
-        url=f"/athlete/{athlete_id}/activities",
-        api_key=api_key,
-        params=more_params,
-    )
-
-    if isinstance(more_result, list):
-        return _filter_named_activities(more_result)
-    return []
 
 
 def _resolve_gear_name(activity: Activity, gear_map: dict[str, str]) -> Activity:
@@ -172,16 +141,10 @@ async def get_activities(  # pylint: disable=too-many-arguments,too-many-return-
     if not activities:
         return f"No valid activities found for athlete {athlete_id_to_use} in the specified date range."
 
-    # Filter and fetch more if needed
+    # Stay inside the requested date range: if filtering leaves fewer than `limit`
+    # named activities, return what is there rather than reaching further back.
     if not include_unnamed:
         activities = _filter_named_activities(activities)
-
-        # If we don't have enough named activities, try to fetch more
-        if len(activities) < limit:
-            more_activities = await _fetch_more_activities(
-                athlete_id_to_use, oldest, api_key, api_limit
-            )
-            activities.extend(more_activities)
 
     # Limit to requested count
     activities = activities[:limit]
