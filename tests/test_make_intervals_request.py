@@ -137,7 +137,17 @@ def use_mock_transport(monkeypatch):
     ("status_code", "body", "expected"),
     [
         (401, b"Unauthorized", "401 Unauthorized: Please check your API key"),
-        (502, b"<html>Bad Gateway</html>", "502 Bad Gateway: Temporary upstream error"),
+        (502, b"<html>Bad Gateway</html>", "502 Bad Gateway: Temporary upstream error; retry shortly."),
+        (
+            502,
+            b"upstream connect error",
+            "502 Bad Gateway: Temporary upstream error; retry shortly. Details: upstream connect error",
+        ),
+        (
+            422,
+            b'{"error": "start_date_local is required"}',
+            'Details: {"error": "start_date_local is required"}',
+        ),
         (400, b"start_date_local is required", "400 Bad Request: start_date_local is required"),
         (409, b"", "409 Conflict: Intervals.icu returned no readable error details."),
         (520, b"<html>Unknown</html>", "520: Intervals.icu returned no readable error details."),
@@ -155,6 +165,18 @@ def test_make_intervals_request_non_json_error_body_keeps_status(
     assert result["status_code"] == status_code
     assert expected in result["message"]
     assert "<html>" not in result["message"]
+
+
+def test_make_intervals_request_mapped_error_without_readable_body_has_no_details(
+    use_mock_transport,
+):
+    """A mapped status with an HTML body returns only the fixed message."""
+    use_mock_transport(504, b"<html>Gateway Timeout</html>")
+
+    result = asyncio.run(server.make_intervals_request("/athlete/i1"))
+
+    assert isinstance(result, dict)
+    assert result["message"] == "504 Gateway Timeout: Temporary upstream timeout; retry shortly."
 
 
 def test_make_intervals_request_truncates_long_error_body(use_mock_transport):

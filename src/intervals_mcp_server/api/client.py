@@ -101,20 +101,22 @@ def _get_error_message(error_code: int, error_text: str) -> str:
         HTTPStatus.SERVICE_UNAVAILABLE: f"{HTTPStatus.SERVICE_UNAVAILABLE.value} {HTTPStatus.SERVICE_UNAVAILABLE.phrase}: The Intervals.icu server might be down or undergoing maintenance.",
         HTTPStatus.GATEWAY_TIMEOUT: f"{HTTPStatus.GATEWAY_TIMEOUT.value} {HTTPStatus.GATEWAY_TIMEOUT.phrase}: Temporary upstream timeout; retry shortly.",
     }
-    try:
-        status = HTTPStatus(error_code)
-    except ValueError:
-        prefix = str(error_code)
-    else:
-        if status in error_messages:
-            return error_messages[status]
-        prefix = f"{status.value} {status.phrase}"
-
     # An HTML page (proxy or CDN error) or an empty body tells the caller nothing.
     detail = error_text.strip()
-    if not detail or detail.startswith("<"):
+    readable = bool(detail) and not detail.startswith("<")
+    detail = detail[:_MAX_ERROR_DETAIL_CHARS]
+
+    try:
+        status: HTTPStatus | None = HTTPStatus(error_code)
+    except ValueError:
+        status = None
+    if status in error_messages:
+        mapped = error_messages[status]
+        return f"{mapped} Details: {detail}" if readable else mapped
+    prefix = f"{status.value} {status.phrase}" if status else str(error_code)
+    if not readable:
         return f"{prefix}: Intervals.icu returned no readable error details."
-    return f"{prefix}: {detail[:_MAX_ERROR_DETAIL_CHARS]}"
+    return f"{prefix}: {detail}"
 
 
 def _prepare_request_config(
